@@ -46,12 +46,6 @@ func CopyBytes(b []byte) []byte {
 	return unsafe.Slice(unsafe.StringData(String(b)), len(b))
 }
 
-//go:noinline
-//go:nosplit
-func Copy(b []byte, b1 []byte) ([]byte, []byte) {
-	return []byte(String(b)), []byte(String(b1))
-}
-
 //go:linkname goReady runtime.goready
 func goReady(goroutinePtr unsafe.Pointer, traceskip int)
 
