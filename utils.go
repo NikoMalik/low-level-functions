@@ -67,8 +67,8 @@ func CopyString(s string) string {
 	return String(c)
 }
 
-// //go:noescape
-// func Compare(a []byte, b []byte) bool
+//go:noescape
+func Compare(a []byte, b []byte) bool
 
 func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 	var (
@@ -327,19 +327,19 @@ func MakeNoZeroCapString(l int, c int) []string {
 //go:linkname memequal runtime.memequal
 func memequal(a, b unsafe.Pointer, size uintptr) bool
 
-func Equal(a, b []byte) bool {
+func Equal(a, b []byte) bool { // Replacement for bytes.Equal
 	return String(a) == String(b)
 }
 
 //go:noinline
 //go:nosplit
-func isNil(v any) bool {
+func IsNil(v any) bool {
 
 	return reflect.ValueOf(v).IsNil()
 }
 
 //go:noinline
 //go:nosplit
-func isEqual(v1, v2 any) bool {
+func IsEqual(v1, v2 any) bool {
 	return unsafe.Pointer(&v1) == unsafe.Pointer(&v2)
 }
