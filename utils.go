@@ -3,8 +3,11 @@ package lowlevelfunctions
 import (
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"unicode/utf8"
 	"unsafe"
+
+	"github.com/NikoMalik/low-level-functions/constants"
 )
 
 type ErrorSizeUnmatch struct {
@@ -21,29 +24,20 @@ func (err *ErrorSizeUnmatch) Error() string {
 		err.fromLength, err.fromSize, err.toSize)
 }
 
-//go:noinline
-//go:nosplit
 func String(b []byte) string {
 
 	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
-//go:noescape
-func Contains(a, b []byte) bool
-
 //go:linkname schedule runtime.schedule
 func schedule()
 
-//go:noinline
-//go:nosplit
 func StringToBytes(s string) []byte {
-	return unsafe.Slice(unsafe.StringData(s), len(s))
-}
-
-//go:noinline
-//go:nosplit
-func CopyBytes(b []byte) []byte {
-	return unsafe.Slice(unsafe.StringData(String(b)), len(b))
+	return *(*[]byte)(unsafe.Pointer(&struct {
+		string
+		Cap int
+	}{s, len(s)},
+	))
 }
 
 //go:linkname goReady runtime.goready
@@ -66,9 +60,6 @@ func CopyString(s string) string {
 	copy(c, StringToBytes(s))
 	return String(c)
 }
-
-//go:noescape
-func Compare(a []byte, b []byte) bool
 
 func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 	var (
@@ -132,9 +123,6 @@ func sysFree(v unsafe.Pointer, n uintptr, sysStat unsafe.Pointer)
 //go:linkname sysFreeOS runtime.sysFreeOS
 func sysFreeOS(v unsafe.Pointer, n uintptr)
 
-//go:linkname sysAlloc runtime.sysAlloc
-func sysAlloc(n uintptr) unsafe.Pointer
-
 type mutex struct {
 	// Futex-based impl treats it as uint32 key,
 	// while sema-based impl as M* waitm.
@@ -151,57 +139,13 @@ func nanotime() int64
 //go:linkname unlock runtime.unlock
 func unlock(l *mutex)
 
-//go:noinline
-//go:nosplit
 func MakeNoZero(l int) []byte {
-	return unsafe.Slice((*byte)(sysAlloc(uintptr(l))), l) // u can also mallocgc
+	return unsafe.Slice((*byte)(mallocgc(uintptr(l), nil, false)), l) //  standart
 
 }
 
-func MakeNoZeroMallocgc(l int) []byte {
-	return unsafe.Slice((*byte)(mallocgc(uintptr(l), nil, false)), l)
-}
-
-// don't forget free memory after sysalloc!!!!!!!!!
-func FreeMemory(ptr unsafe.Pointer, size uintptr) {
-	sysFree(ptr, size, nil)
-}
-
-//go:noinline
-//go:nosplit
-func FreeNoZero(b []byte) {
-	if cap(b) > 0 {
-		sysFree(unsafe.Pointer(&b[0]), uintptr(cap(b)), nil)
-
-		b = nil
-	}
-}
-
-//go:noinline
-//go:nosplit
-func FreeNoZeroString(strs []string) {
-	if cap(strs) > 0 {
-		sysFree(unsafe.Pointer(&strs[0]), uintptr(cap(strs))*unsafe.Sizeof(strs[0]), nil)
-
-		strs = nil
-	}
-}
-
-//go:noinline
-//go:nosplit
 func MakeNoZeroCap(l int, c int) []byte {
 	return MakeNoZero(c)[:l]
-}
-
-type sliceHeader struct {
-	Data unsafe.Pointer
-	Len  int
-	Cap  int
-}
-
-func SliceUnsafePointer[T any](slice []T) unsafe.Pointer {
-	header := *(*sliceHeader)(unsafe.Pointer(&slice))
-	return header.Data
 }
 
 type StringBuffer struct {
@@ -256,26 +200,26 @@ func (b *StringBuffer) Grow(n int) {
 }
 
 func (b *StringBuffer) Write(p []byte) (int, error) {
-	b.copyCheck()
+
 	b.buf = append(b.buf, p...)
 	return len(p), nil
 }
 
 func (b *StringBuffer) WriteByte(c byte) error {
-	b.copyCheck()
+
 	b.buf = append(b.buf, c)
 	return nil
 }
 
 func (b *StringBuffer) WriteRune(r rune) (int, error) {
-	b.copyCheck()
+
 	n := len(b.buf)
 	b.buf = utf8.AppendRune(b.buf, r)
 	return len(b.buf) - n, nil
 }
 
 func (b *StringBuffer) WriteString(s string) (int, error) {
-	b.copyCheck()
+
 	b.buf = append(b.buf, s...)
 	return len(s), nil
 }
@@ -327,19 +271,127 @@ func MakeNoZeroCapString(l int, c int) []string {
 //go:linkname memequal runtime.memequal
 func memequal(a, b unsafe.Pointer, size uintptr) bool
 
-func Equal(a, b []byte) bool { // Replacement for bytes.Equal
-	return String(a) == String(b)
+func Equal(a, b []byte) bool {
+	return memequal(unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), uintptr(len(a)))
+
 }
 
-//go:noinline
-//go:nosplit
+/*
+_Bool memequal (void *, void *, uintptr)
+  __asm__ (GOSYM_PREFIX "runtime.memequal")
+  __attribute__ ((no_split_stack));
+
+_Bool
+memequal (void *p1, void *p2, uintptr len)
+{
+  return __builtin_memcmp (p1, p2, len) == 0;
+}
+
+
+*/
+
 func IsNil(v any) bool {
+	/*
+		var x *int
+		var y any
+		fmt.Println(x == nil) // false
+		fmt.Println(isNil(x))           // true
+		fmt.Println(x == nil) // true
+		fmt.Println(isNil(y))           // panic
+
+
+	*/
 
 	return reflect.ValueOf(v).IsNil()
 }
 
-//go:noinline
-//go:nosplit
+// IsEqual checks if two variables point to the same memory location.
+//
+// It uses unsafe.Pointer to get the memory address of the variables.
+// The equality check is performed by comparing the memory addresses.
+//
+// Parameters:
+// - v1: The first variable.
+// - v2: The second variable.
+//
+// Returns:
+// - bool: True if the variables point to the same memory location, false otherwise.
 func IsEqual(v1, v2 any) bool {
+	// Get the memory address of the variables using unsafe.Pointer.
+	// The & operator returns the memory address of a variable.
+	// The unsafe.Pointer type is used to store and manipulate untyped memory.
+	// It is commonly used in low-level programming to bypass type safety checks.
+	//
+	// The &v1 and &v2 expressions take the address of v1 and v2 variables respectively.
+	// The expressions return pointers to the variables.
 	return unsafe.Pointer(&v1) == unsafe.Pointer(&v2)
+}
+
+type CacheLinePadding struct {
+	_ [constants.CacheLinePadSize]byte
+}
+
+// Example of using cache line padding
+
+type AtomicCounter struct {
+	value atomic.Int32
+	_     [constants.CacheLinePadSize - unsafe.Sizeof(atomic.Int32{})]byte
+}
+
+func (a *AtomicCounter) Increment(int) {
+
+	a.value.Add(1)
+}
+
+func (a *AtomicCounter) Get() int32 {
+	return a.value.Load()
+
+}
+
+type AtomicCounterWithoutPad struct {
+	value atomic.Int32
+}
+
+func (a *AtomicCounterWithoutPad) Increment(int) {
+
+	a.value.Add(1)
+}
+
+func (a *AtomicCounterWithoutPad) Get() int32 {
+	return a.value.Load()
+
+}
+
+type ShardedAtomicCounter struct {
+	shards [10]AtomicCounter
+}
+
+func (a *ShardedAtomicCounter) Increment(id int) {
+	a.shards[id].value.Add(1)
+}
+
+func (a *ShardedAtomicCounter) Get() int32 {
+	var value int32
+	for i := 0; i < 10; i++ {
+		value += a.shards[i].Get()
+
+	}
+	return value
+}
+
+type ShardedAtomicCounterWithoutPad struct {
+	shards [10]AtomicCounter
+}
+
+func (a *ShardedAtomicCounterWithoutPad) Increment(id int) {
+	a.shards[id].value.Add(1)
+}
+
+func (a *ShardedAtomicCounterWithoutPad) Get() int32 {
+	var value int32
+	for i := 0; i < 10; i++ {
+		value += a.shards[i].Get()
+
+	}
+	return value
 }
