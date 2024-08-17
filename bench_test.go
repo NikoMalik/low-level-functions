@@ -120,7 +120,7 @@ func BenchmarkMakeNoZeroString(b *testing.B) {
 		}
 	})
 
-	b.Run("Standard make([]byte)", func(b *testing.B) {
+	b.Run("Standard make([]string)", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			buf := make([]string, size)
 			_ = buf
