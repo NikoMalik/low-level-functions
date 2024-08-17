@@ -279,20 +279,6 @@ func Equal(a, b []byte) bool {
 
 }
 
-/*
-_Bool memequal (void *, void *, uintptr)
-  __asm__ (GOSYM_PREFIX "runtime.memequal")
-  __attribute__ ((no_split_stack));
-
-_Bool
-memequal (void *p1, void *p2, uintptr len)
-{
-  return __builtin_memcmp (p1, p2, len) == 0;
-}
-
-
-*/
-
 func IsNil(v any) bool {
 	/*
 		var x *int
