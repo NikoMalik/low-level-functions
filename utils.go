@@ -272,6 +272,9 @@ func MakeNoZeroCapString(l int, c int) []string {
 func memequal(a, b unsafe.Pointer, size uintptr) bool
 
 func Equal(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
 	return memequal(unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), uintptr(len(a)))
 
 }
