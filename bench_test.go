@@ -238,7 +238,7 @@ func BenchmarkGetItem(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < len(intSlice); i++ {
+	for i := 0; i < b.N; i++ {
 		_ = GetItem(intSlice, 5000)
 	}
 }
@@ -248,7 +248,17 @@ func BenchmarkStandardIndexing(b *testing.B) {
 
 	b.ResetTimer()
 
-	for i := 0; i < len(intSlice); i++ {
-		_ = intSlice[5000]
+	for i := 0; i < b.N; i++ {
+		_ = intSlice[9000]
+	}
+}
+
+func BenchmarkGetTimeWithoutChecking(b *testing.B) {
+	intSlice := make([]int, 10000)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = GetItemWithoutCheck(intSlice, 9000)
 	}
 }

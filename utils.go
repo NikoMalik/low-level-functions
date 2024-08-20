@@ -395,3 +395,10 @@ func GetItem[T any](slice []T, idx int) T { // experimental same performance as 
 
 	return *(*T)(ptr)
 }
+
+func GetItemWithoutCheck[T any](slice []T, idx int) T { // clears the checks for idx and make it faster but not safe
+
+	ptr := unsafe.Pointer(uintptr(unsafe.Pointer(&slice[0])) + uintptr(idx)*unsafe.Sizeof(slice[0]))
+
+	return *(*T)(ptr)
+}
