@@ -56,7 +56,6 @@ func BenchmarkStringsBuilder(b *testing.B) {
 	}
 }
 
-// Benchmark String Conversion
 func BenchmarkString(b *testing.B) {
 	data := []byte("This is a benchmark test for String conversion.")
 
@@ -232,4 +231,24 @@ func BenchmarkAtomicCounter(b *testing.B) {
 		}
 	})
 
+}
+
+func BenchmarkGetItem(b *testing.B) {
+	intSlice := make([]int, 10000)
+
+	b.ResetTimer()
+
+	for i := 0; i < len(intSlice); i++ {
+		_ = GetItem(intSlice, 5000)
+	}
+}
+
+func BenchmarkStandardIndexing(b *testing.B) {
+	intSlice := make([]int, 10000)
+
+	b.ResetTimer()
+
+	for i := 0; i < len(intSlice); i++ {
+		_ = intSlice[5000]
+	}
 }

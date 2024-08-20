@@ -384,3 +384,14 @@ func (a *ShardedAtomicCounterWithoutPad) Get() int32 {
 	}
 	return value
 }
+
+func GetItem[T any](slice []T, idx int) T { // experimental same performance as original
+
+	if len(slice) == 0 || idx < 0 || idx >= len(slice) {
+		panic("index out of range")
+	}
+
+	ptr := unsafe.Pointer(uintptr(unsafe.Pointer(&slice[0])) + uintptr(idx)*unsafe.Sizeof(slice[0]))
+
+	return *(*T)(ptr)
+}
