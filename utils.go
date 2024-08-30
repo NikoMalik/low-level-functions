@@ -402,3 +402,7 @@ func GetItemWithoutCheck[T any](slice []T, idx int) T { // clears the checks for
 
 	return *(*T)(ptr)
 }
+
+func Pointer[T any](d T) *T {
+	return &d
+}
