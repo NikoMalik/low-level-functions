@@ -320,6 +320,8 @@ type CacheLinePadding struct {
 	_ [constants.CacheLinePadSize]byte
 }
 
+var CacheLinePadSize = constants.CacheLinePadSize
+
 // Example of using cache line padding
 
 type AtomicCounter struct {
