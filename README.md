@@ -1,8 +1,6 @@
 # low-level-functions
 
-Low-level functions for golang that help to avoid allocations
-
-# remarks:
+> Low-level functions for golang that help to avoid allocations
 
 1. **String(b []byte) string**
 
