@@ -62,13 +62,13 @@ Low-level functions for golang that help to avoid allocations
 
     - **What it does**: Allocates memory for a slice of any type with initialization with zeros.
     - **Why it's faster**: Optimized for large amounts of data, uses `mallocgc` with initialization.
-    - **Risks**: Less risky since data is initialized with zeros, but takes more time compared to `MakeNoZero`.
+    - **Risks**: Similar `MakeNoZero`.
 
 11. **MakeZeroCap[T any](l int, c int) []T**
 
     - **What it does**: Creates a slice with a specific length and capacity with initialization with zeros.
     - **Why it's faster**: Similar to `MakeZero`, optimized for big data.
-    - **Risks**: Less risky compared to `MakeNoZeroCap`.
+    - **Risks**: Similar `MakeNoZeroCap`.
 
 12. **MakeNoZeroString(l int) []string**
 
