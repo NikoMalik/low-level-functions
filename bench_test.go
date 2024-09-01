@@ -127,6 +127,69 @@ func BenchmarkMakeNoZeroString(b *testing.B) {
 	})
 }
 
+func BenchmarkMakeNoZeroStringSmall(b *testing.B) {
+	size := 5
+
+	b.Run("Custom MakeNoZero", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := MakeNoZeroString(size)
+			_ = buf
+
+		}
+	})
+
+	b.Run("Standard make([]string)", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := make([]string, size)
+			_ = buf
+		}
+	})
+}
+
+type fny struct {
+	a0, a1, a2, a3, a4, a5, a6, a7, a8, a9 string
+	b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 int
+	c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 float64
+	d0, d1, d2, d3, d4, d5, d6, d7, d8, d9 bool
+	e0, e1, e2, e3, e4, e5, e6, e7, e8, e9 struct {
+		f0, f1, f2, f3, f4, f5, f6, f7, f8, f9 int
+	}
+}
+
+func BenchmarkMakeNoZeroAny(b *testing.B) {
+
+	b.Run("Custom MakeNoZero", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := MakeZero[fny](1024)
+			_ = buf
+		}
+	})
+
+	b.Run("Standard make([]fny)", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := make([]fny, 1024)
+			_ = buf
+		}
+	})
+}
+
+func BenchmarkMakeNoZeroCapAny(b *testing.B) {
+
+	b.Run("Custom MakeNoZero", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := MakeZeroCap[fny](0, 1024)
+			_ = buf
+		}
+	})
+
+	b.Run("Standard make([]fny)", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			buf := make([]fny, 0, 1024)
+			_ = buf
+		}
+	})
+}
+
 func BenchmarkStringToBytes(b *testing.B) {
 	// Generate a large number of strings for testing
 	testStrings := generateTestStrings(100000, 10, 100) // 100,000 strings with lengths between 10 and 100
@@ -187,50 +250,6 @@ func BenchmarkConvertSlice(b *testing.B) {
 			_ = ConvertSliceManual(data)
 		}
 	})
-}
-
-func BenchmarkAtomicCounter(b *testing.B) {
-	counter := AtomicCounter{}
-	withoutPad := AtomicCounterWithoutPad{}
-	withShar := ShardedAtomicCounter{}
-	withSharNoPad := ShardedAtomicCounterWithoutPad{}
-
-	b.Run("With CacheLine Padding", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			go func() {
-				counter.Increment(1)
-				_ = counter.Get()
-			}()
-		}
-	})
-
-	b.Run("Without CacheLine Padding", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			go func() {
-				withoutPad.Increment(1)
-				_ = withoutPad.Get()
-			}()
-		}
-	})
-
-	b.Run("With CacheLine Padding and shard", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			go func() {
-				withShar.Increment(1)
-				_ = withShar.Get()
-			}()
-		}
-	})
-
-	b.Run("Without CacheLine Padding and with shard", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			go func() {
-				withSharNoPad.Increment(1)
-				_ = withSharNoPad.Get()
-			}()
-		}
-	})
-
 }
 
 func BenchmarkGetItem(b *testing.B) {

@@ -29,9 +29,6 @@ func String(b []byte) string {
 	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
-//go:linkname schedule runtime.schedule
-func schedule()
-
 func StringToBytes(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&struct {
 		string
@@ -39,21 +36,6 @@ func StringToBytes(s string) []byte {
 	}{s, len(s)},
 	))
 }
-
-//go:linkname goReady runtime.goready
-func goReady(goroutinePtr unsafe.Pointer, traceskip int)
-
-//go:linkname mCall runtime.mcall
-func mCall(fn func(unsafe.Pointer))
-
-//go:linkname readGStatus runtime.readgstatus
-func readGStatus(gp unsafe.Pointer) uint32
-
-//go:linkname casGStatus runtime.casgstatus
-func casGStatus(gp unsafe.Pointer, oldval, newval uint32)
-
-//go:linkname dropG runtime.dropg
-func dropG()
 
 func CopyString(s string) string {
 	c := MakeNoZero(len(s))
@@ -117,28 +99,6 @@ func swap[T any](a, b *T) {
 //go:linkname mallocgc runtime.mallocgc
 func mallocgc(size uintptr, typ unsafe.Pointer, needzero bool) unsafe.Pointer
 
-//go:linkname sysFree runtime.sysFree
-func sysFree(v unsafe.Pointer, n uintptr, sysStat unsafe.Pointer)
-
-//go:linkname sysFreeOS runtime.sysFreeOS
-func sysFreeOS(v unsafe.Pointer, n uintptr)
-
-type mutex struct {
-	// Futex-based impl treats it as uint32 key,
-	// while sema-based impl as M* waitm.
-	// Used to be a union, but unions break precise GC.
-	key uintptr
-}
-
-//go:linkname lock runtime.lock
-func lock(l *mutex)
-
-//go:linkname nanotime runtime.nanotime
-func nanotime() int64
-
-//go:linkname unlock runtime.unlock
-func unlock(l *mutex)
-
 func MakeNoZero(l int) []byte {
 	return unsafe.Slice((*byte)(mallocgc(uintptr(l), nil, false)), l) //  standart
 
@@ -149,8 +109,7 @@ func MakeNoZeroCap(l int, c int) []byte {
 }
 
 type StringBuffer struct {
-	buf  []byte
-	addr *StringBuffer
+	buf []byte
 }
 
 func NewStringBuffer(cap int) *StringBuffer {
@@ -227,15 +186,6 @@ func (b *StringBuffer) WriteString(s string) (int, error) {
 //go:linkname noescape runtime.noescape
 func noescape(p unsafe.Pointer) unsafe.Pointer
 
-func (b *StringBuffer) copyCheck() {
-	if b.addr == nil {
-
-		b.addr = (*StringBuffer)(noescape(unsafe.Pointer(b)))
-	} else if b.addr != b {
-		panic("strings: illegal use of non-zero Builder copied by value")
-	}
-}
-
 func ConvertOne[TFrom, TTo any](from TFrom) (TTo, error) {
 	var (
 		zeroValFrom TFrom
@@ -258,6 +208,16 @@ func MustConvertOne[TFrom, TTo any](from TFrom) TTo {
 
 	return *(*TTo)(unsafe.Pointer(&from))
 
+}
+
+func MakeZero[T any](l int) []T { // for now better works with big size
+	return unsafe.Slice((*T)(mallocgc(uintptr(l), nil, true)), l)
+}
+
+// in future i'll try to replace interface
+
+func MakeZeroCap[T any](l int, c int) []T { //  // for now better works with big size
+	return MakeZero[T](c)[:l]
 }
 
 func MakeNoZeroString(l int) []string {
@@ -325,6 +285,7 @@ var CacheLinePadSize = constants.CacheLinePadSize
 // Example of using cache line padding
 
 type AtomicCounter struct {
+	_     CacheLinePadding // 64 or 32
 	value atomic.Int32
 	_     [constants.CacheLinePadSize - unsafe.Sizeof(atomic.Int32{})]byte
 }
@@ -337,54 +298,6 @@ func (a *AtomicCounter) Increment(int) {
 func (a *AtomicCounter) Get() int32 {
 	return a.value.Load()
 
-}
-
-type AtomicCounterWithoutPad struct {
-	value atomic.Int32
-}
-
-func (a *AtomicCounterWithoutPad) Increment(int) {
-
-	a.value.Add(1)
-}
-
-func (a *AtomicCounterWithoutPad) Get() int32 {
-	return a.value.Load()
-
-}
-
-type ShardedAtomicCounter struct {
-	shards [10]AtomicCounter
-}
-
-func (a *ShardedAtomicCounter) Increment(id int) {
-	a.shards[id].value.Add(1)
-}
-
-func (a *ShardedAtomicCounter) Get() int32 {
-	var value int32
-	for i := 0; i < 10; i++ {
-		value += a.shards[i].Get()
-
-	}
-	return value
-}
-
-type ShardedAtomicCounterWithoutPad struct {
-	shards [10]AtomicCounter
-}
-
-func (a *ShardedAtomicCounterWithoutPad) Increment(id int) {
-	a.shards[id].value.Add(1)
-}
-
-func (a *ShardedAtomicCounterWithoutPad) Get() int32 {
-	var value int32
-	for i := 0; i < 10; i++ {
-		value += a.shards[i].Get()
-
-	}
-	return value
 }
 
 func GetItem[T any](slice []T, idx int) T { // experimental same performance as original
