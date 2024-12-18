@@ -10,6 +10,13 @@ import (
 	"github.com/NikoMalik/low-level-functions/constants"
 )
 
+//go:nosplit
+//go:nocheckptr
+func Noescape(up unsafe.Pointer) unsafe.Pointer {
+	x := uintptr(up)
+	return unsafe.Pointer(x ^ 0)
+}
+
 type ErrorSizeUnmatch struct {
 	fromLength int
 	fromSize   int64
@@ -182,9 +189,6 @@ func (b *StringBuffer) WriteString(s string) (int, error) {
 	b.buf = append(b.buf, s...)
 	return len(s), nil
 }
-
-//go:linkname noescape runtime.noescape
-func noescape(p unsafe.Pointer) unsafe.Pointer
 
 func ConvertOne[TFrom, TTo any](from TFrom) (TTo, error) {
 	var (
