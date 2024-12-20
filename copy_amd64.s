@@ -1,3 +1,7 @@
+#include "textflag.h"
+#include "go_asm.h"
+#include "funcdata.h"
+
 
 //copy arrays
 TEXT ·memcopy_avx2_64(SB), $0-16
