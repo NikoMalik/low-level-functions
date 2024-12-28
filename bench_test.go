@@ -7,12 +7,99 @@ import (
 	"testing"
 )
 
+const x64 = 64
+
 func ConvertSliceManual(from []int64) []int32 {
 	to := make([]int32, len(from))
 	for i, v := range from {
 		to[i] = int32(v)
 	}
 	return to
+}
+
+func TestCopyUnsafe(t *testing.T) {
+	// Test 1: Standard case
+	source := []byte("Hello, World!")
+	destination := make([]byte, len(source))
+	n := CopyUnsafe(destination, source)
+	if n != len(source) {
+		t.Errorf("Expected %d bytes copied, got %d", len(source), n)
+	}
+	if string(destination) != string(source) {
+		t.Errorf("Expected destination %q, got %q", string(source), string(destination))
+	}
+
+	// Test 2: Different lengths (source longer than destination)
+	source = []byte("Hello, Go!")
+	destination = make([]byte, len(source)-2) // Smaller destination
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for size mismatch, but none occurred")
+		}
+	}()
+	_ = CopyUnsafe(destination, source)
+
+	// Test 3: Empty slices
+	source = []byte{}
+	destination = []byte{}
+	n = CopyUnsafe(destination, source)
+	if n != 0 {
+		t.Errorf("Expected 0 bytes copied, got %d", n)
+	}
+}
+
+func TestStrings(t *testing.T) {
+	// Test 1: Standard case
+	source := []byte("Hello, World!")
+
+	n := String(source)
+	if n != string(source) {
+		t.Errorf("Expected %s string copied, got %s", string(source), n)
+	}
+
+	source1 := "Hello,world!"
+
+	n1 := StringToBytes(source1)
+	if string(n1) != source1 {
+		t.Errorf("Expected %s string copied, got %s", source, n1)
+	}
+
+}
+
+func BenchmarkCopyUnsafe(b *testing.B) {
+	source := []byte("Benchmarking Unsafe Copy!")
+	destination := make([]byte, len(source))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CopyUnsafe(destination, source)
+	}
+}
+
+func BenchmarkCopyStandart(b *testing.B) {
+	source := []byte("Benchmarking Standart Copy!")
+	destination := make([]byte, len(source))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		copy(destination, source)
+	}
+}
+
+func BenchmarkCopy_currentBytes(b *testing.B) {
+	source := []byte("Benchmarking Current Copy!")
+	destination := make([]byte, len(source))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		copy(destination[:26], source)
+	}
+}
+
+func BenchmarkCopy_currentBytes_UNSAFE(b *testing.B) {
+	source := []byte("Benchmarking Current Copy!")
+	destination := make([]byte, len(source))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CopyUnsafe(destination[:26], source)
+	}
 }
 
 func generateTestStrings(count, minLength, maxLength int) []string {
@@ -58,6 +145,7 @@ func BenchmarkStringsBuilder(b *testing.B) {
 
 func BenchmarkString(b *testing.B) {
 	data := []byte("This is a benchmark test for String conversion.")
+	length := len(data)
 
 	b.Run("Custom String", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -65,6 +153,19 @@ func BenchmarkString(b *testing.B) {
 		}
 	})
 
+	b.Run("Custom string 2", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = string2(data, length)
+		}
+
+	})
+
+	b.Run("Custom string 3", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = string3(data)
+		}
+
+	})
 	b.Run("Standard String", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = string(data)
@@ -211,15 +312,38 @@ func BenchmarkStringToBytes(b *testing.B) {
 	})
 }
 
+func TestEquals(t *testing.T) {
+	t.Run("TestEqualsTrue", func(t *testing.T) {
+		a := []byte("This is a benchmark test for Equal.....")
+		bb := []byte("This is a benchmark test for Equal.....")
+		lengthA := uintptr(len(a))
+		boole := Equal(a, bb, lengthA)
+		if boole == false {
+			t.Log("IsEqual: ", Equal(a, bb, lengthA))
+		}
+	})
+	t.Run("TestEqualsFalse", func(t *testing.T) {
+		a := []byte("This is a benchmark test for Equal.....")
+		bb := []byte("This is a benchmark test for Equal.....1")
+		lengthA := uintptr(len(a))
+		boole := Equal(a, bb, lengthA)
+		if boole == true {
+			t.Log("IsEqual: ", Equal(a, bb, lengthA))
+		}
+
+	})
+}
+
 func BenchmarkEqualTrue(b *testing.B) { // true
 	a := []byte("This is a benchmark test for Equal.....")
 	bb := []byte("This is a benchmark test for Equal.....")
+	lengthA := uintptr(len(a))
 
 	b.Run("Custom Equal", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			boole := Equal(a, bb)
+			boole := Equal(a, bb, lengthA)
 			if boole == false {
-				b.Log("IsEqual: ", Equal(a, bb))
+				b.Log("IsEqual: ", Equal(a, bb, lengthA))
 			}
 		}
 	})
@@ -231,6 +355,15 @@ func BenchmarkEqualTrue(b *testing.B) { // true
 				b.Log("bytes.Equal: ", bytes.Equal(a, bb))
 			}
 
+		}
+	})
+
+	b.Run("TEST GENERIC EQUAL", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			boole := String(a) == String(bb)
+			if boole == false {
+				b.Fatal("GenericEqual: ", Equal(a, bb, lengthA))
+			}
 		}
 	})
 }

@@ -10,6 +10,18 @@ import (
 	"github.com/NikoMalik/low-level-functions/constants"
 )
 
+//go:linkname memmove runtime.memmove
+func memmove(dst, src unsafe.Pointer, n uintptr)
+
+// constants in make for  standart copy is more faster,but if no constant we can use CopyUnsafe()
+// make([]byte, len(src)) not constant make([]byte, 0) constant
+//
+//go:nocheckptr
+func CopyUnsafe(dst []byte, src []byte) int {
+	memmove(unsafe.Pointer(&dst[0]), unsafe.Pointer(&src[0]), uintptr(len(src)))
+	return len(src)
+}
+
 //go:nosplit
 //go:nocheckptr
 func Noescape(up unsafe.Pointer) unsafe.Pointer {
@@ -32,16 +44,24 @@ func (err *ErrorSizeUnmatch) Error() string {
 }
 
 func String(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func string2(b []byte, length int) string {
+	return *(*string)(unsafe.Pointer(&struct {
+		*byte
+		int
+	}{(*byte)(unsafe.Pointer(&b[0])), length}))
+}
+
+// too slow
+func string3(b []byte) string {
 
 	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
 func StringToBytes(s string) []byte {
-	return *(*[]byte)(unsafe.Pointer(&struct {
-		string
-		Cap int
-	}{s, len(s)},
-	))
+	return *(*[]byte)(unsafe.Pointer(&s))
 }
 
 func CopyString(s string) string {
@@ -60,7 +80,7 @@ func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 	minSize := unsafe.Sizeof(zeroValTo)
 
 	if minSize > maxSize {
-		swap(&minSize, &maxSize)
+		Swap(&minSize, &maxSize)
 	}
 
 	if unsafe.Sizeof(zeroValFrom) == minSize {
@@ -97,7 +117,7 @@ func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 }
 
 //go:noinline
-func swap[T any](a, b *T) {
+func Swap[T any](a, b *T) {
 	tmp := *a
 	*a = *b
 	*b = tmp
@@ -235,11 +255,8 @@ func MakeNoZeroCapString(l int, c int) []string {
 //go:linkname memequal runtime.memequal
 func memequal(a, b unsafe.Pointer, size uintptr) bool
 
-func Equal(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	return memequal(unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), uintptr(len(a)))
+func Equal(a, b []byte, length uintptr) bool {
+	return memequal(unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), length)
 
 }
 
@@ -269,7 +286,7 @@ func IsNil(v any) bool {
 //
 // Returns:
 // - bool: True if the variables point to the same memory location, false otherwise.
-func IsEqual(v1, v2 any) bool {
+func IsEqual[T any](v1, v2 T) bool {
 	// Get the memory address of the variables using unsafe.Pointer.
 	// The & operator returns the memory address of a variable.
 	// The unsafe.Pointer type is used to store and manipulate untyped memory.
@@ -315,6 +332,7 @@ func GetItem[T any](slice []T, idx int) T { // experimental same performance as 
 	return *(*T)(ptr)
 }
 
+//go:nocheckptr
 func GetItemWithoutCheck[T any](slice []T, idx int) T { // clears the checks for idx and make it faster but not safe
 
 	ptr := unsafe.Pointer(uintptr(unsafe.Pointer(&slice[0])) + uintptr(idx)*unsafe.Sizeof(slice[0]))
