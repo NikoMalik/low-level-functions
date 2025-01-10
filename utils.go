@@ -3,6 +3,7 @@ package lowlevelfunctions
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"unicode/utf8"
 	"unsafe"
@@ -16,6 +17,83 @@ const (
 	SliceSize     = int(unsafe.Sizeof([]byte{}))
 	CacheLineSize = constants.CacheLinePadSize
 )
+
+type MutableString []byte
+
+func (m *MutableString) String() string {
+	if len(*m) == 0 {
+		return ""
+	}
+	return String(*m)
+}
+
+func (m *MutableString) StringNoZero() string {
+	if len(*m) == 0 {
+		return ""
+	}
+	result := String(*m)
+	return strings.TrimRight(result, "\x00")
+}
+func (m *MutableString) AppendString(s string) {
+	if len(*m) == 0 {
+		*m = MakeNoZeroCap(0, len(s))
+	}
+	*m = append(*m, s...)
+}
+
+func (m *MutableString) AppendByte(c byte) {
+	if len(*m) == 0 {
+		*m = MakeNoZeroCap(0, 1)
+	}
+	*m = append(*m, c)
+}
+
+func (m *MutableString) Get(i int) byte {
+	return (*m)[i]
+}
+
+func (m *MutableString) Append(data []byte) {
+	if len(*m) == 0 {
+		*m = MakeNoZeroCap(0, len(data))
+	}
+	*m = append(*m, data...)
+}
+
+func (m *MutableString) Len() int {
+	return len(*m)
+}
+
+func (m *MutableString) Clear() {
+	*m = (*m)[:0]
+}
+
+func (m *MutableString) SetString(s string) {
+	if len(*m) < len(s) {
+		*m = StringToBytes(s)
+	} else {
+		copy(*m, s)
+	}
+}
+
+func (m *MutableString) IsEmpty() bool {
+	return len(*m) == 0
+}
+
+func (m *MutableString) ToUpper() {
+	*m = []byte(strings.ToUpper(m.String()))
+}
+
+func (m *MutableString) ToLower() {
+	*m = []byte(strings.ToLower(m.String()))
+}
+
+func (m *MutableString) Trim() {
+	*m = []byte(strings.TrimSpace(m.String()))
+}
+
+func (m *MutableString) Equals(other string) bool {
+	return m.String() == other
+}
 
 type String_t struct {
 	Data unsafe.Pointer

@@ -7,7 +7,65 @@ import (
 	"testing"
 )
 
-const x64 = 64
+func TestMutableString_String(t *testing.T) {
+	ms := MutableString("Hello, world!")
+	expected := "Hello, world!"
+
+	result := ms.String()
+
+	if result != expected {
+		t.Errorf("Expected: %q, got: %q", expected, result)
+	}
+}
+
+func TestMutableString_Modify(t *testing.T) {
+	ms := MutableString("Hello, world!")
+
+	ms[0] = 'h'
+
+	expected := "hello, world!"
+	result := ms.String()
+
+	if result != expected {
+		t.Errorf("Expected: %q, got: %q", expected, result)
+	}
+}
+
+func TestMutableString_Empty(t *testing.T) {
+	var ms MutableString
+
+	expected := ""
+	result := ms.String()
+
+	if result != expected {
+		t.Errorf("Expected empty string, got: %q", result)
+	}
+}
+
+func TestMutableString_SetString(t *testing.T) {
+	var ms MutableString
+
+	ms.SetString("Hello, Go!")
+	expected := "Hello, Go!"
+
+	result := ms.String()
+
+	if result != expected {
+		t.Errorf("Expected: %q, got: %q", expected, result)
+	}
+}
+
+func TestMutableStringCreate(t *testing.T) {
+	ms := make(MutableString, 12)
+	ms.SetString("Hello, Go!")
+	expected := "Hello, Go!"
+
+	result := ms.StringNoZero()
+
+	if result != expected {
+		t.Errorf("Expected: %q, got: %q", expected, result)
+	}
+}
 
 func ConvertSliceManual(from []int64) []int32 {
 	to := make([]int32, len(from))
