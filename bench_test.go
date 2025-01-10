@@ -64,6 +64,15 @@ func TestStrings(t *testing.T) {
 		t.Errorf("Expected %s string copied, got %s", source, n1)
 	}
 
+	n2 := unsafeGetBytes(source1)
+	if string(n2) != source1 {
+		t.Errorf("Expected %s string copied, got %s", source, n2)
+	}
+	// n2 := _stringToBytes_(source1)
+	// if string(n2) != source1 {
+	// 	t.Errorf("Expected %s string copied, got %s", source, n2)
+	// }
+
 }
 
 func BenchmarkCopyUnsafe(b *testing.B) {
@@ -145,26 +154,43 @@ func BenchmarkStringsBuilder(b *testing.B) {
 
 func BenchmarkString(b *testing.B) {
 	data := []byte("This is a benchmark test for String conversion.")
-	length := len(data)
 
-	b.Run("Custom String", func(b *testing.B) {
+	b.Run("*(*string)", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = String(data)
 		}
 	})
 
-	b.Run("Custom string 2", func(b *testing.B) {
+	b.Run("*(*string)(&struct)", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = string2(data, length)
+			_ = string2(data)
 		}
 
 	})
 
-	b.Run("Custom string 3", func(b *testing.B) {
+	b.Run(" unsafe.String", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = string3(data)
 		}
 
+	})
+
+	b.Run("headerstring", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = string1(data)
+		}
+
+	})
+	b.Run(" with custom struct", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = string_b(data)
+		}
+	})
+
+	b.Run("multiply headers converting", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = string4(data)
+		}
 	})
 	b.Run("Standard String", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -176,7 +202,7 @@ func BenchmarkString(b *testing.B) {
 func BenchmarkStringToBytesSmallString(b *testing.B) {
 	data := "I'm looking forward to season 5 of the boys "
 
-	b.Run("Custom StringToBytes", func(b *testing.B) {
+	b.Run("convert with &struct", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = StringToBytes(data)
 		}
@@ -187,6 +213,39 @@ func BenchmarkStringToBytesSmallString(b *testing.B) {
 			_ = []byte(data)
 		}
 	})
+
+	b.Run("unsafeSlice StringToBytes", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = stringToBytes_(data)
+		}
+
+	})
+	b.Run("simple converting with *(*) StringToBytes", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = _stringToBytes_(data)
+		}
+
+	})
+	b.Run("convert to string with multiply headers", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = unsafeGetBytes(data)
+		}
+	})
+
+	b.Run("convert to string with custom &struct with unsafe.Pointer data", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = stringBytes(data)
+		}
+
+	})
+
+	b.Run("convert to string with array", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = unsafeGetBytes_2(data)
+		}
+
+	})
+
 }
 
 // Benchmark Memory Allocation and Copying
@@ -295,7 +354,7 @@ func BenchmarkStringToBytes(b *testing.B) {
 	// Generate a large number of strings for testing
 	testStrings := generateTestStrings(100000, 10, 100) // 100,000 strings with lengths between 10 and 100
 
-	b.Run("Custom StringToBytesBigString", func(b *testing.B) {
+	b.Run(" with &struct", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, str := range testStrings {
 				_ = StringToBytes(str)
@@ -309,6 +368,22 @@ func BenchmarkStringToBytes(b *testing.B) {
 				_ = []byte(str)
 			}
 		}
+	})
+	b.Run("just converting *(*string)", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, str := range testStrings {
+				_ = _stringToBytes_(str)
+			}
+		}
+
+	})
+	b.Run("unsafeSlice StringToBytes", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, str := range testStrings {
+				_ = unsafeGetBytes(str)
+			}
+		}
+
 	})
 }
 
@@ -395,7 +470,7 @@ func BenchmarkGetItem(b *testing.B) {
 	}
 }
 
-func BenchmarkStandardIndexing(b *testing.B) {
+func BenchmarkStandartIndexing(b *testing.B) {
 	intSlice := make([]int, 10000)
 
 	b.ResetTimer()
@@ -413,4 +488,16 @@ func BenchmarkGetTimeWithoutChecking(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = GetItemWithoutCheck(intSlice, 9000)
 	}
+}
+
+func BenchmarkNextPower2(b *testing.B) {
+
+	number1 := uintptr(49130)
+
+	b.Run("Default NextPowerOfTwo", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			number1 = NextPowerOfTwo(number1)
+		}
+	})
+
 }

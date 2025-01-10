@@ -10,6 +10,25 @@ import (
 	"github.com/NikoMalik/low-level-functions/constants"
 )
 
+const (
+	PtrSize       = 4 << (^uintptr(0) >> 63)
+	StrSize       = int(unsafe.Sizeof(""))
+	SliceSize     = int(unsafe.Sizeof([]byte{}))
+	CacheLineSize = constants.CacheLinePadSize
+)
+
+type String_t struct {
+	Data unsafe.Pointer
+	Len  int
+}
+
+// Slice internals from reflect
+type Slice_t struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
+}
+
 //go:linkname memmove runtime.memmove
 func memmove(dst, src unsafe.Pointer, n uintptr)
 
@@ -43,25 +62,85 @@ func (err *ErrorSizeUnmatch) Error() string {
 		err.fromLength, err.fromSize, err.toSize)
 }
 
-func String(b []byte) string {
+func string2(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
-func string2(b []byte, length int) string {
-	return *(*string)(unsafe.Pointer(&struct {
-		*byte
-		int
-	}{(*byte)(unsafe.Pointer(&b[0])), length}))
+func string1(b []byte) string {
+	h := *(*reflect.StringHeader)(unsafe.Pointer(&b))
+	h.Data = uintptr(unsafe.Pointer(&b[0]))
+	h.Len = len(b)
+	return *(*string)(unsafe.Pointer(&h))
 }
 
-// too slow
+func string_b(b []byte) string {
+	h := *(*String_t)(unsafe.Pointer(&b))
+	h.Data = unsafe.Pointer(&b[0])
+	h.Len = len(b)
+	return *(*string)(unsafe.Pointer(&h))
+}
+
+func String(b []byte) string {
+	return *(*string)(unsafe.Pointer(&struct {
+		uintptr
+		int
+	}{uintptr(unsafe.Pointer(&b[0])), len(b)}))
+}
+
 func string3(b []byte) string {
 
 	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
-func StringToBytes(s string) []byte {
+func string4(b []byte) string {
+	(*reflect.StringHeader)(unsafe.Pointer(&b)).Data = uintptr(unsafe.Pointer(&b[0]))
+	(*reflect.StringHeader)(unsafe.Pointer(&b)).Len = len(b)
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func unsafeGetBytes(s string) (b []byte) {
+	(*reflect.SliceHeader)(unsafe.Pointer(&b)).Data = (*reflect.StringHeader)(unsafe.Pointer(&s)).Data
+	(*reflect.SliceHeader)(unsafe.Pointer(&b)).Cap = len(s)
+	(*reflect.SliceHeader)(unsafe.Pointer(&b)).Len = len(s)
+	return
+}
+
+func unsafeGetBytes_2(s string) []byte {
+	const MaxInt32 = 1<<31 - 1
+	return (*[MaxInt32]byte)(unsafe.Pointer((*reflect.StringHeader)(
+		unsafe.Pointer(&s)).Data))[: len(s)&MaxInt32 : len(s)&MaxInt32]
+}
+
+func _stringToBytes_(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&s))
+}
+
+func stringTobytes(s string) []byte {
+	h := (*(*reflect.SliceHeader)(unsafe.Pointer(&s)))
+	h.Len = len(s)
+	h.Cap = len(s)
+	h.Data = uintptr(unsafe.Pointer(&s))
+	return *(*[]byte)(unsafe.Pointer(&h))
+}
+
+func stringBytes(s string) []byte {
+	h := *(*Slice_t)(unsafe.Pointer(&s))
+	h.Len = len(s)
+	h.Cap = len(s)
+	h.Data = unsafe.Pointer(&s)
+	return *(*[]byte)(unsafe.Pointer(&h))
+}
+
+func stringToBytes_(s string) []byte {
+	return unsafe.Slice((*byte)(unsafe.Pointer(&s)), len(s))
+}
+
+func StringToBytes(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&struct {
+		uintptr
+		int
+		i int
+	}{*(*uintptr)((unsafe.Pointer(&s))), len(s), len(s)}))
 }
 
 func CopyString(s string) string {
@@ -301,8 +380,6 @@ type CacheLinePadding struct {
 	_ [constants.CacheLinePadSize]byte
 }
 
-var CacheLinePadSize = constants.CacheLinePadSize
-
 // Example of using cache line padding
 
 type AtomicCounter struct {
@@ -335,11 +412,51 @@ func GetItem[T any](slice []T, idx int) T { // experimental same performance as 
 //go:nocheckptr
 func GetItemWithoutCheck[T any](slice []T, idx int) T { // clears the checks for idx and make it faster but not safe
 
-	ptr := unsafe.Pointer(uintptr(unsafe.Pointer(&slice[0])) + uintptr(idx)*unsafe.Sizeof(slice[0]))
-
-	return *(*T)(ptr)
+	ptr := (*T)(unsafe.Add(unsafe.Pointer(&slice[0]), uintptr(idx)*unsafe.Sizeof(slice[0])))
+	return *ptr
 }
 
 func Pointer[T any](d T) *T {
 	return &d
+}
+
+var tab64 = [64]uintptr{
+	63, 0, 58, 1, 59, 47, 53, 2,
+	60, 39, 48, 27, 54, 33, 42, 3,
+	61, 51, 37, 40, 49, 18, 28, 20,
+	55, 30, 34, 11, 43, 14, 22, 4,
+	62, 57, 46, 52, 38, 26, 32, 41,
+	50, 36, 17, 19, 29, 10, 13, 21,
+	56, 45, 25, 31, 35, 16, 9, 12,
+	44, 24, 15, 8, 23, 7, 6, 5,
+}
+
+// log2 computes the binary logarithm of x, rounded up to the next integer
+func Log2(i uintptr) (n uintptr) {
+	if i == 0 {
+		return 0
+	}
+
+	i |= i >> 1
+	i |= i >> 2
+	i |= i >> 4
+	i |= i >> 8
+	i |= i >> 16
+	i |= i >> 32
+
+	// Use the lookup table to determine the position of the highest bit.
+	return uintptr(tab64[((i-(i>>1))*0x07EDD5E59A4E28C2)>>58])
+
+}
+
+func NextPowerOfTwo(i uintptr) uintptr {
+	i--
+	i |= i >> 1
+	i |= i >> 2
+	i |= i >> 4
+	i |= i >> 8
+	i |= i >> 16
+	i |= i >> 32
+	i++
+	return i
 }
