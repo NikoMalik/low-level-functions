@@ -18,6 +18,21 @@ func TestMutableString_String(t *testing.T) {
 	}
 }
 
+func TestUnsafePointer(t *testing.T) {
+	var ha = make(MutableString, 12)
+
+	ha.SetString("Hello, world!")
+
+	ptrOfInf := UnsafePointer(ha)
+
+	fmt.Println(ptrOfInf)
+
+	value := ConvertUnsafePointer[MutableString](ptrOfInf)
+
+	fmt.Println(string(value))
+
+}
+
 func TestMutableString_Modify(t *testing.T) {
 	ms := MutableString("Hello, world!")
 

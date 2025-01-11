@@ -95,6 +95,14 @@ func (m *MutableString) Equals(other string) bool {
 	return m.String() == other
 }
 
+func UnsafePointer[T any](b T) unsafe.Pointer {
+	return unsafe.Pointer(&b)
+}
+
+func ConvertUnsafePointer[T any](p unsafe.Pointer) T {
+	return *(*T)(p)
+}
+
 type String_t struct {
 	Data unsafe.Pointer
 	Len  int
