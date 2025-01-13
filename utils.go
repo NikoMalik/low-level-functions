@@ -18,6 +18,21 @@ const (
 	CacheLineSize = constants.CacheLinePadSize
 )
 
+func Malloc[T any](len, cap int) []T {
+	if len < 0 || cap < len {
+		panic("invalid slice length or capacity")
+	}
+	var t T
+	size := unsafe.Sizeof(t) * uintptr(cap)
+	ptr := mallocgc(size, nil, false)
+
+	return *(*[]T)(unsafe.Pointer(&struct {
+		Data uintptr
+		Len  int
+		Cap  int
+	}{uintptr(ptr), len, cap}))
+}
+
 type MutableString []byte
 
 func (m *MutableString) String() string {

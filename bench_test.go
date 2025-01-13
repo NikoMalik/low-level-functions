@@ -7,6 +7,67 @@ import (
 	"testing"
 )
 
+var block1kb = 1024
+var data []byte
+
+func BenchmarkDirtBytes(b *testing.B) {
+	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data = Malloc[byte](size, size)
+			}
+		})
+	}
+}
+
+func BenchmarkDirtBytes_MakeNozero(b *testing.B) {
+	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data = MakeNoZero(size)
+			}
+		})
+	}
+}
+
+func BenchmarkOriginBytes(b *testing.B) {
+	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data = make([]byte, size)
+			}
+		})
+	}
+}
+
+func TestMallocSlice(t *testing.T) {
+	slice := Malloc[int](5, 10)
+
+	if len(slice) != 5 {
+		t.Errorf("Expected length 5, got %d", len(slice))
+	}
+	if cap(slice) != 10 {
+		t.Errorf("Expected capacity 10, got %d", cap(slice))
+	}
+}
+
+type TestStruct struct {
+	A int
+	B float64
+	C byte
+}
+
+func TestMallocStruct(t *testing.T) {
+	slice := Malloc[TestStruct](3, 6)
+
+	if len(slice) != 3 {
+		t.Errorf("Expected length 3, got %d", len(slice))
+	}
+	if cap(slice) != 6 {
+		t.Errorf("Expected capacity 6, got %d", cap(slice))
+	}
+}
+
 func TestMutableString_String(t *testing.T) {
 	ms := MutableString("Hello, world!")
 	expected := "Hello, world!"
