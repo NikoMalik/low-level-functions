@@ -23,8 +23,8 @@ func Malloc[T any](len, cap int) []T {
 		panic("invalid slice length or capacity")
 	}
 	var t T
-	size := unsafe.Sizeof(t) * uintptr(cap)
-	ptr := mallocgc(size, nil, false)
+
+	ptr := mallocgc(unsafe.Sizeof(t)*uintptr(cap), nil, false)
 
 	return *(*[]T)(unsafe.Pointer(&struct {
 		Data uintptr
