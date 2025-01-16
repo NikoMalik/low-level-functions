@@ -51,6 +51,26 @@ func TestMallocSlice(t *testing.T) {
 	}
 }
 
+func TestMalloc(t *testing.T) {
+	slice := Malloc[byte](5, 10)
+
+	if len(slice) != 5 {
+		t.Errorf("Expected length 5, got %d", len(slice))
+	}
+	if cap(slice) != 10 {
+		t.Errorf("Expected capacity 10, got %d", cap(slice))
+	}
+
+	slice = append(slice, 1, 2, 3, 4, 5)
+
+	if len(slice) != 10 {
+		t.Errorf("Expected length 10, got %d", len(slice))
+	}
+	if cap(slice) != 10 {
+		t.Errorf("Expected capacity 10, got %d", cap(slice))
+	}
+}
+
 type TestStruct struct {
 	A int
 	B float64
@@ -77,6 +97,20 @@ func TestMutableString_String(t *testing.T) {
 	if result != expected {
 		t.Errorf("Expected: %q, got: %q", expected, result)
 	}
+}
+
+func TestMutable(t *testing.T) {
+	var ms MutableString
+
+	ms.SetString("abcdef")
+	fmt.Println(ms.String())
+	ms.SetString("xyz")
+
+	fmt.Println(ms.String())
+
+	ms.AppendString("zzz")
+	fmt.Println(ms.String())
+
 }
 
 func TestUnsafePointer(t *testing.T) {
