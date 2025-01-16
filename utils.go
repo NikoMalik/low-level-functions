@@ -83,11 +83,12 @@ func (m *MutableString) Clear() {
 }
 
 func (m *MutableString) SetString(s string) {
-	m.Clear()
-	if len(*m) < len(s) {
-		*m = StringToBytes(s)
-	} else {
+
+	if cap(*m) >= len(s) {
+		*m = (*m)[:len(s)]
 		copy(*m, s)
+	} else {
+		*m = []byte(s)
 	}
 }
 

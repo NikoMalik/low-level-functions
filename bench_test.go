@@ -40,6 +40,74 @@ func BenchmarkOriginBytes(b *testing.B) {
 	}
 }
 
+func BenchmarkMutableString_SetString(b *testing.B) {
+	var m MutableString
+	for i := 0; i < b.N; i++ {
+		m.SetString("benchmark")
+
+		m.SetString("ben10")
+	}
+	_ = m
+}
+
+func BenchmarkMutableStringPool_SetString(b *testing.B) {
+	var m = AcquireMutableString()
+
+	for i := 0; i < b.N; i++ {
+		m.SetString("benchmark")
+
+		m.SetString("ben10")
+	}
+	_ = m
+	ReleaseMutableString(m)
+
+}
+
+func BenchmarkString_SetString(b *testing.B) {
+	var m []byte
+	for i := 0; i < b.N; i++ {
+		m = []byte("benchmark")
+		m = []byte("ben10")
+	}
+	_ = m
+}
+
+func BenchmarkString_AppendString(b *testing.B) {
+	s := ""
+	for i := 0; i < 1000; i++ {
+		s += "test"
+	}
+}
+func BenchmarkMutableString_AppendString(b *testing.B) {
+	var m MutableString
+	for i := 0; i < 1000; i++ {
+		m.AppendString("test")
+	}
+}
+
+func BenchmarkMutableString_Clear(b *testing.B) {
+	var m MutableString
+	m.SetString("some long text")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Clear()
+	}
+}
+
+func BenchmarkMutableString_ToUpper(b *testing.B) {
+	m := MutableString("benchmark")
+	for i := 0; i < b.N; i++ {
+		m.ToUpper()
+	}
+}
+
+func BenchmarkMutableString_ToLower(b *testing.B) {
+	m := MutableString("BENCHMARK")
+	for i := 0; i < b.N; i++ {
+		m.ToLower()
+	}
+}
+
 func TestMallocSlice(t *testing.T) {
 	slice := Malloc[int](5, 10)
 
@@ -96,6 +164,58 @@ func TestMutableString_String(t *testing.T) {
 
 	if result != expected {
 		t.Errorf("Expected: %q, got: %q", expected, result)
+	}
+}
+
+func TestMutableString_Set(t *testing.T) {
+	var m MutableString
+
+	m.SetString("hello")
+	if m.String() != "hello" {
+		t.Errorf("Expected 'hello', got '%s'", m.String())
+	}
+
+	m.SetString("world")
+	if m.String() != "world" {
+		t.Errorf("Expected 'world', got '%s'", m.String())
+	}
+
+	m.SetString("")
+	if m.String() != "" {
+		t.Errorf("Expected empty string, got '%s'", m.String())
+	}
+}
+
+func TestMutableString_Clear(t *testing.T) {
+	m := MutableString("hello")
+	m.Clear()
+
+	if len(m) != 0 {
+		t.Errorf("Expected length 0, got %d", len(m))
+	}
+
+	if cap(m) < 5 {
+		t.Errorf("Expected at least cap 5, got %d", cap(m))
+	}
+}
+
+func TestMutableString_AppendString(t *testing.T) {
+	var m MutableString
+	m.AppendString("hello")
+	m.AppendString(" world")
+
+	if m.String() != "hello world" {
+		t.Errorf("Expected 'hello world', got '%s'", m.String())
+	}
+}
+
+func TestMutableString_AppendByte(t *testing.T) {
+	var m MutableString
+	m.AppendByte('A')
+	m.AppendByte('B')
+
+	if m.String() != "AB" {
+		t.Errorf("Expected 'AB', got '%s'", m.String())
 	}
 }
 
