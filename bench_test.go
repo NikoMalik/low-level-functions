@@ -5,10 +5,33 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 var block1kb = 1024
 var data []byte
+
+func TestUnsafePointerExtraction(t *testing.T) {
+
+	var empty []byte
+
+	defer func() {
+
+		r := recover()
+		if r == nil {
+			t.Errorf("Expected panic for empty slice, but no panic occurred")
+		}
+	}()
+
+	_ = uintptr(unsafe.Pointer(&empty[0]))
+
+	data := []byte{}
+
+	fmt.Println(String(data))
+	fmt.Println(string3(data))
+	fmt.Println(&data[0])
+
+}
 
 func BenchmarkDirtBytes(b *testing.B) {
 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {

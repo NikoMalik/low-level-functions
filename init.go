@@ -12,6 +12,7 @@ var mutableStringPool = &sync.Pool{
 	},
 }
 
+// for big changed strings
 func AcquireMutableString() *MutableString {
 	return mutableStringPool.Get().(*MutableString)
 }

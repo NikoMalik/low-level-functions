@@ -187,7 +187,7 @@ func String(b []byte) string {
 	return *(*string)(unsafe.Pointer(&struct {
 		uintptr
 		int
-	}{uintptr(unsafe.Pointer(&b[0])), len(b)}))
+	}{*(*uintptr)(unsafe.Pointer(&b)), len(b)}))
 }
 
 func string3(b []byte) string {
@@ -243,7 +243,7 @@ func StringToBytes(s string) []byte {
 		uintptr
 		int
 		i int
-	}{*(*uintptr)((unsafe.Pointer(&s))), len(s), len(s)}))
+	}{*(*uintptr)(unsafe.Pointer(&s)), len(s), len(s)}))
 }
 
 func CopyString(s string) string {
