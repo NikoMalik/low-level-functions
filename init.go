@@ -7,7 +7,7 @@ import (
 
 var mutableStringPool = &sync.Pool{
 	New: func() any {
-		buf := MakeNoZeroCap(0, StrSize*os.Getpagesize())
+		buf := MakeNoZeroCap(0, int(StrSize*uintptr(os.Getpagesize())))
 		return (*MutableString)(&buf)
 	},
 }

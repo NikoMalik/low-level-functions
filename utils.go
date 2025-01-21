@@ -13,9 +13,10 @@ import (
 
 const (
 	PtrSize       = 4 << (^uintptr(0) >> 63)
-	StrSize       = int(unsafe.Sizeof(""))
+	StrSize       = unsafe.Sizeof("")
 	SliceSize     = int(unsafe.Sizeof([]byte{}))
 	CacheLineSize = constants.CacheLinePadSize
+	MaxInt32      = 1<<31 - 1
 )
 
 func Malloc[T any](len, cap int) []T {
