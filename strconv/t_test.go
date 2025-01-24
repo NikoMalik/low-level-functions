@@ -33,16 +33,20 @@ func FormatUint16Default(u uint16) string {
 	return strconv.FormatUint(uint64(u), 10)
 }
 
-func BenchmarkParseUint16_my(b *testing.B) {
+func BenchmarkFormatUint16_my(b *testing.B) {
+	var u string
 
 	for i := 0; i < b.N; i++ {
-		FormatUint16(8080)
+		u = FormatUint16(8080)
+		_ = u
 	}
 }
 
 func BenchmarkFormatUint16_default(b *testing.B) {
+	var u string
 
 	for i := 0; i < b.N; i++ {
-		FormatUint16Default(8080)
+		u = FormatUint16Default(8080)
+		_ = u
 	}
 }

@@ -17,21 +17,31 @@ const (
 	SliceSize     = int(unsafe.Sizeof([]byte{}))
 	CacheLineSize = constants.CacheLinePadSize
 	MaxInt32      = 1<<31 - 1
+	MaxUintptr    = ^uintptr(0)
 )
 
+func MulUintptr(a, b uintptr) (uintptr, bool) {
+	if a|b < 1<<(4*PtrSize) || a == 0 {
+		return a * b, false
+	}
+	overflow := b > MaxUintptr/a
+	return a * b, overflow
+}
+
 func Malloc[T any](len, cap int) []T {
-	if len < 0 || cap < len {
+	// if len < 0 || cap < len {
+	// 	panic("invalid slice length or capacity")
+	// }
+	var t T
+	mem, overflow := MulUintptr(unsafe.Sizeof(t), uintptr(cap))
+	if overflow || len < 0 || len > cap {
 		panic("invalid slice length or capacity")
 	}
-	var t T
-
-	ptr := mallocgc(unsafe.Sizeof(t)*uintptr(cap), nil, false)
-
 	return *(*[]T)(unsafe.Pointer(&struct {
 		Data uintptr
 		Len  int
 		Cap  int
-	}{uintptr(ptr), len, cap}))
+	}{uintptr(mallocgc(mem, nil, false)), len, cap}))
 }
 
 type MutableString []byte

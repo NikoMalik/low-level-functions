@@ -73,19 +73,6 @@ func BenchmarkMutableString_SetString(b *testing.B) {
 	_ = m
 }
 
-func BenchmarkMutableStringPool_SetString(b *testing.B) {
-	var m = AcquireMutableString()
-
-	for i := 0; i < b.N; i++ {
-		m.SetString("benchmark")
-
-		m.SetString("ben10")
-	}
-	_ = m
-	ReleaseMutableString(m)
-
-}
-
 func BenchmarkString_SetString(b *testing.B) {
 	var m []byte
 	for i := 0; i < b.N; i++ {
