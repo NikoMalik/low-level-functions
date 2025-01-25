@@ -28,7 +28,7 @@ func MulUintptr(a, b uintptr) (uintptr, bool) {
 	return a * b, overflow
 }
 
-func Malloc[T any](len, cap int) []T {
+func MallocSlice[T any](len, cap int) []T {
 	// if len < 0 || cap < len {
 	// 	panic("invalid slice length or capacity")
 	// }
@@ -41,7 +41,40 @@ func Malloc[T any](len, cap int) []T {
 		Data uintptr
 		Len  int
 		Cap  int
-	}{uintptr(mallocgc(mem, nil, false)), len, cap}))
+	}{uintptr(mallocgc(mem, Pointer(reflect.TypeOf(t)), false)), len, cap}))
+}
+
+func Malloc[T any](t T) *T {
+	// Allocate memory and then copy the value of t into the allocated memory
+	ptr := (*T)(mallocgc(unsafe.Sizeof(t), Pointer(reflect.TypeOf(t)), false))
+	*ptr = t // Copy the value of t into the allocated memory
+	return ptr
+}
+
+//go:linkname newarray runtime.newarray
+func newarray(t unsafe.Pointer, n int) unsafe.Pointer
+
+func MakeSlice[T any](len, cap int) []T {
+	var typ T
+	return *(*[]T)(unsafe.Pointer(&struct {
+		Data uintptr
+		Len  int
+		Cap  int
+	}{uintptr(newarray(Pointer(typ), cap)), len, cap}))
+
+}
+
+type Iface struct {
+	typ unsafe.Pointer
+	ptr unsafe.Pointer
+}
+
+func Inspect(v interface{}) (reflect.Type, unsafe.Pointer) {
+	return reflect.TypeOf(v), Pointer(v)
+}
+
+func Pointer(v interface{}) unsafe.Pointer {
+	return (*Iface)(unsafe.Pointer(&v)).ptr
 }
 
 type MutableString []byte
@@ -528,10 +561,6 @@ func GetItemWithoutCheck[T any](slice []T, idx int) T { // clears the checks for
 
 	ptr := (*T)(unsafe.Add(unsafe.Pointer(&slice[0]), uintptr(idx)*unsafe.Sizeof(slice[0])))
 	return *ptr
-}
-
-func Pointer[T any](d T) *T {
-	return &d
 }
 
 var tab64 = [64]uintptr{

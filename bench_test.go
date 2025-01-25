@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"unsafe"
+
+	"github.com/NikoMalik/low-level-functions/mem"
 )
 
 var block1kb = 1024
@@ -37,9 +39,35 @@ func BenchmarkDirtBytes(b *testing.B) {
 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				data = Malloc[byte](size, size)
+				data = MallocSlice[byte](size, size)
 			}
 		})
+	}
+}
+
+func BenchmarkArrayBytes(b *testing.B) {
+	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data = MakeSlice[byte](size, size)
+			}
+		})
+	}
+}
+
+func must[T any](v T, err int) T {
+
+	return v
+}
+func BenchmarkDirtSys(b *testing.B) {
+	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data = *(*[]byte)(must(mem.SysAlloc(size)))
+				mem.SysFree(data)
+			}
+		})
+
 	}
 }
 
@@ -61,6 +89,24 @@ func BenchmarkOriginBytes(b *testing.B) {
 			}
 		})
 	}
+}
+
+func BenchmarkMakeSlice(b *testing.B) {
+
+	b.Run("MakeSlice", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			data = MakeSlice[byte](1000, 1000)
+		}
+	})
+}
+
+func BenchmarkMake(b *testing.B) {
+
+	b.Run("Make", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			data = make([]byte, 1000, 1000)
+		}
+	})
 }
 
 func BenchmarkMutableString_SetString(b *testing.B) {
@@ -119,7 +165,7 @@ func BenchmarkMutableString_ToLower(b *testing.B) {
 }
 
 func TestMallocSlice(t *testing.T) {
-	slice := Malloc[int](5, 10)
+	slice := MallocSlice[int](5, 10)
 
 	if len(slice) != 5 {
 		t.Errorf("Expected length 5, got %d", len(slice))
@@ -130,7 +176,7 @@ func TestMallocSlice(t *testing.T) {
 }
 
 func TestMalloc(t *testing.T) {
-	slice := Malloc[byte](5, 10)
+	slice := MallocSlice[byte](5, 10)
 
 	if len(slice) != 5 {
 		t.Errorf("Expected length 5, got %d", len(slice))
@@ -149,6 +195,26 @@ func TestMalloc(t *testing.T) {
 	}
 }
 
+func TestCopyMakeSlice(t *testing.T) {
+	slice := MakeSlice[int](5, 10)
+	slice2 := make([]int, 0, 10)
+	slice2 = append(slice2, 1, 2, 3, 4, 5)
+	copy(slice, slice2)
+
+	if len(slice) != 5 {
+		t.Errorf("Expected length 5, got %d", len(slice))
+	}
+	if cap(slice) != 10 {
+		t.Errorf("Expected capacity 10, got %d", cap(slice))
+	}
+
+	if slice[0] != 1 || slice[1] != 2 || slice[2] != 3 || slice[3] != 4 || slice[4] != 5 {
+		t.Errorf("Incorrect: %v", slice)
+	}
+
+	// fmt.Println(slice)
+}
+
 type TestStruct struct {
 	A int
 	B float64
@@ -156,13 +222,125 @@ type TestStruct struct {
 }
 
 func TestMallocStruct(t *testing.T) {
-	slice := Malloc[TestStruct](3, 6)
+	slice := MallocSlice[TestStruct](3, 6)
 
 	if len(slice) != 3 {
 		t.Errorf("Expected length 3, got %d", len(slice))
 	}
 	if cap(slice) != 6 {
 		t.Errorf("Expected capacity 6, got %d", cap(slice))
+	}
+}
+
+type Example struct {
+	Value int
+}
+
+// TestMalloc tests the Malloc function
+func TestMalloc_noslice(t *testing.T) {
+	// Test with an int
+	intValue := 42
+	intPointer := Malloc(intValue)
+	if intPointer == nil {
+		t.Errorf("Malloc returned nil for int")
+	}
+	// Test if the value of the int is the same as the passed value
+	if *intPointer != intValue {
+		t.Errorf("Expected %v for *intPointer, got %v", intValue, *intPointer)
+	}
+
+	// Test with a string
+	stringValue := "Hello"
+	stringPointer := Malloc(stringValue)
+	if stringPointer == nil {
+		t.Errorf("Malloc returned nil for string")
+	}
+	// Test if the value of the string is the same as the passed value
+	if *stringPointer != stringValue {
+		t.Errorf("Expected %v for *stringPointer, got %v", stringValue, *stringPointer)
+	}
+
+	// Test with a custom struct
+	structValue := Example{Value: 100}
+	structPointer := Malloc(structValue)
+	if structPointer == nil {
+		t.Errorf("Malloc returned nil for Example struct")
+	}
+	// Test if the struct's field is the same as the passed value
+	if structPointer.Value != structValue.Value {
+		t.Errorf("Expected %v for structPointer.Value, got %v", structValue.Value, structPointer.Value)
+	}
+}
+
+func TestMakeSlice_DataManipulation(t *testing.T) {
+	slice := MakeSlice[int](4, 6)
+
+	for i := 0; i < len(slice); i++ {
+		slice[i] = i * 10
+	}
+
+	for i, v := range slice {
+		if v != i*10 {
+			t.Errorf("Expected %d, got %d", i*10, v)
+		}
+	}
+}
+
+func TestMakeSliceStruct(t *testing.T) {
+	slice := MakeSlice[TestStruct](3, 6)
+
+	if len(slice) != 3 {
+		t.Errorf("Expected length 3, got %d", len(slice))
+	}
+	if cap(slice) != 6 {
+		t.Errorf("Expected capacity 6, got %d", cap(slice))
+	}
+}
+
+func TestMakeSlice_FloatSlice(t *testing.T) {
+	slice := MakeSlice[float64](3, 6)
+
+	if len(slice) != 3 {
+		t.Errorf("Expected: 3, got: %d", len(slice))
+	}
+	if cap(slice) != 6 {
+		t.Errorf("Expected: 6, got: %d", cap(slice))
+	}
+
+	slice[0] = 1.1
+	slice[1] = 2.2
+	slice[2] = 3.3
+
+	if slice[0] != 1.1 || slice[1] != 2.2 || slice[2] != 3.3 {
+		t.Errorf("eror with float64: %v", slice)
+	}
+}
+
+func TestMakeSlice_EmptySlice(t *testing.T) {
+	slice := MakeSlice[int](0, 0)
+
+	if len(slice) != 0 {
+		t.Errorf("Expected: 0, got: %d", len(slice))
+	}
+	if cap(slice) != 0 {
+		t.Errorf("Expected: 0, got: %d", cap(slice))
+	}
+}
+
+func TestMakeSlice_StringSlice(t *testing.T) {
+	slice := MakeSlice[string](3, 5)
+
+	if len(slice) != 3 {
+		t.Errorf("Expected: 3, got: %d", len(slice))
+	}
+	if cap(slice) != 5 {
+		t.Errorf("Expected: 5, got: %d", cap(slice))
+	}
+	slice[0] = "hello"
+	slice[1] = "world"
+
+	if slice[0] != "hello" || slice[1] != "world" {
+		t.Errorf("incorrect: %v", slice)
 	}
 }
 
