@@ -44,6 +44,14 @@ func MallocSlice[T any](len, cap int) []T {
 	}{uintptr(mallocgc(mem, Pointer(reflect.TypeOf(t)), false)), len, cap}))
 }
 
+func GetPrivateField[T any, V any](ptr *T, fieldName string) *V {
+	t := reflect.TypeOf(*ptr)
+	field, _ := t.FieldByName(fieldName)
+	fieldOffset := field.Offset
+
+	return (*V)(unsafe.Pointer(uintptr(unsafe.Pointer(ptr)) + fieldOffset))
+}
+
 func Malloc[T any](t T) *T {
 	// Allocate memory and then copy the value of t into the allocated memory
 	ptr := (*T)(mallocgc(unsafe.Sizeof(t), Pointer(reflect.TypeOf(t)), false))

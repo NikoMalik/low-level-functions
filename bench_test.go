@@ -7,7 +7,10 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/NikoMalik/low-level-functions/example"
 	"github.com/NikoMalik/low-level-functions/mem"
+
+	"github.com/NikoMalik/low-level-functions/union"
 )
 
 var block1kb = 1024
@@ -26,8 +29,6 @@ func TestUnsafePointerExtraction(t *testing.T) {
 	}()
 
 	_ = uintptr(unsafe.Pointer(&empty[0]))
-
-	data := []byte{}
 
 	fmt.Println(String(data))
 	fmt.Println(string3(data))
@@ -71,6 +72,22 @@ func BenchmarkDirtSys(b *testing.B) {
 	}
 }
 
+// var mm *arena.Arena
+//
+// func BenchmarkArenaBytes(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data, mm = MakeArenaSlice[byte](size, size)
+// 				mm.Free()
+//
+// 			}
+// 		})
+//
+// 	}
+//
+// }
+
 func BenchmarkDirtBytes_MakeNozero(b *testing.B) {
 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
@@ -89,15 +106,6 @@ func BenchmarkOriginBytes(b *testing.B) {
 			}
 		})
 	}
-}
-
-func BenchmarkMakeSlice(b *testing.B) {
-
-	b.Run("MakeSlice", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			data = MakeSlice[byte](1000, 1000)
-		}
-	})
 }
 
 func BenchmarkMake(b *testing.B) {
@@ -977,3 +985,128 @@ func BenchmarkNextPower2(b *testing.B) {
 	})
 
 }
+
+func TestUnion_SetInt64_GetInt64(t *testing.T) {
+	u := union.NewUnion[int64]()
+	val := int64(42)
+
+	u.SetInt64(val)
+	got := u.GetInt64()
+
+	if got != val {
+		t.Errorf("GetInt64() = %v, want %v", got, val)
+	}
+}
+
+func TestUnion_SetFloat64_GetFloat64(t *testing.T) {
+	u := union.NewUnion[float64]()
+	val := float64(3.14)
+
+	u.SetFloat64(val)
+	got := u.GetFloat64()
+
+	if got != val {
+		t.Errorf("GetFloat64() = %v, want %v", got, val)
+	}
+}
+
+func TestUnion_Set_Get_Int64(t *testing.T) {
+	u := union.NewUnion[int64]()
+	val := int64(100)
+
+	err := u.Set(val)
+	if err != nil {
+		t.Fatalf("Set() failed: %v", err)
+	}
+
+	got, err := u.Get()
+	if err != nil {
+		t.Fatalf("Get() failed: %v", err)
+	}
+
+	if got != val {
+		t.Errorf("Get() = %v, want %v", got, val)
+	}
+}
+
+func TestUnion_Set_Get_Float64(t *testing.T) {
+	u := union.NewUnion[float64]()
+	val := float64(2.71)
+
+	err := u.Set(val)
+	if err != nil {
+		t.Fatalf("Set() failed: %v", err)
+	}
+
+	got, err := u.Get()
+	if err != nil {
+		t.Fatalf("Get() failed: %v", err)
+	}
+
+	if got != val {
+		t.Errorf("Get() = %v, want %v", got, val)
+	}
+}
+
+func TestUnion_Set_UnsupportedType(t *testing.T) {
+	u := union.NewUnion[string]()
+	val := "unsupported type"
+
+	err := u.Set(val)
+	if err == nil {
+		t.Error("Expected error for unsupported type, got nil")
+	}
+}
+
+func TestUnion_Get_Uninitialized(t *testing.T) {
+	u := union.NewUnion[int64]()
+
+	_, err := u.Get()
+	if err == nil {
+		t.Error("Expected error for uninitialized union, got nil")
+	}
+}
+
+func TestUnion_Set_TypeTooLarge(t *testing.T) {
+	u := union.NewUnion[[16]byte]()
+	val := [16]byte{}
+
+	err := u.Set(val)
+	if err == nil {
+		t.Error("Expected error for type too large, got nil")
+	}
+}
+
+func TestUnion_SizeOf(t *testing.T) {
+	u := union.NewUnion[int64]()
+	val := int64(0)
+
+	size := unsafe.Sizeof(val)
+	if size > uintptr(len(u.Data())) {
+		t.Errorf("Size of int64 (%d) exceeds union capacity (%d)", size, len(u.Data()))
+	}
+}
+
+func TestGetField(t *testing.T) {
+	s := example.NewExmp()
+
+	privateField := GetPrivateField[example.Exmp, int](&s, "private")
+
+	fmt.Println(*privateField)
+
+}
+
+//
+// func TestArena(t *testing.T) {
+// 	f := MakeShareArray[string](0, 10)
+// 	f.Append(("a"))
+// 	gg := f.GetElement(0)
+// 	fmt.Println(string(*gg))
+// 	f.Append(("b"))
+// 	fmt.Println(string(*f.GetElement(1)))
+// 	fmt.Println(string(*f.GetElement(0)))
+//
+// 	f.Append("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+// 	fmt.Println(string(*f.GetElement(2)))
+//
+// }
