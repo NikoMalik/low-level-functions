@@ -29,9 +29,6 @@ func MulUintptr(a, b uintptr) (uintptr, bool) {
 }
 
 func MallocSlice[T any](len, cap int) []T {
-	// if len < 0 || cap < len {
-	// 	panic("invalid slice length or capacity")
-	// }
 	var t T
 	mem, overflow := MulUintptr(unsafe.Sizeof(t), uintptr(cap))
 	if overflow || len < 0 || len > cap {
@@ -46,6 +43,7 @@ func MallocSlice[T any](len, cap int) []T {
 
 func GetPrivateField[T any, V any](ptr *T, fieldName string) *V {
 	t := reflect.TypeOf(*ptr)
+
 	field, _ := t.FieldByName(fieldName)
 	fieldOffset := field.Offset
 
@@ -92,6 +90,17 @@ func (m *MutableString) String() string {
 		return ""
 	}
 	return String(*m)
+}
+
+// ONLY FOR SHOW EXAMPLE
+// USE DEFAULT [3:5] IN PROD
+func BytesFromRange(start, end uintptr) []byte {
+	length := end - start
+	return *(*[]byte)(unsafe.Pointer(&struct {
+		uintptr
+		int
+		i int
+	}{start, int(length), int(length)}))
 }
 
 func (m *MutableString) StringNoZero() string {
@@ -420,7 +429,6 @@ func (b *StringBuffer) Grow(n int) {
 }
 
 func (b *StringBuffer) Write(p []byte) (int, error) {
-
 	b.buf = append(b.buf, p...)
 	return len(p), nil
 }
