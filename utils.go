@@ -28,6 +28,34 @@ func MulUintptr(a, b uintptr) (uintptr, bool) {
 	return a * b, overflow
 }
 
+//go:noescape
+func GetG() unsafe.Pointer
+
+//go:noescape
+//go:linkname runtime_procPin runtime.procPin
+func runtime_procPin() int
+
+//go:noescape
+//go:linkname runtime_procUnpin runtime.procUnpin
+func runtime_procUnpin()
+
+// Pin pins current p, return pid.
+func Pin() int {
+	return runtime_procPin()
+}
+
+// Unpin unpins current p.
+func Unpin() {
+	runtime_procUnpin()
+}
+
+// Pid returns the id of current p.
+func Pid() (id int) {
+	id = runtime_procPin()
+	runtime_procUnpin()
+	return
+}
+
 func MallocSlice[T any](len, cap int) []T {
 	var t T
 	mem, overflow := MulUintptr(unsafe.Sizeof(t), uintptr(cap))
