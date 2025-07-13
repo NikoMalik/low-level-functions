@@ -28,6 +28,47 @@ func MulUintptr(a, b uintptr) (uintptr, bool) {
 	return a * b, overflow
 }
 
+func isLittleEndian() bool {
+	var i uint16 = 0x0102
+	b := (*[2]byte)(unsafe.Pointer(&i))
+	return b[0] == 0x02
+}
+func Uint32_littleEndian(b *[4]byte) uint32 {
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+}
+
+func Uint32_bigEndian(b *[4]byte) uint32 {
+	return uint32(b[3]) | uint32(b[2])<<8 | uint32(b[1])<<16 | uint32(b[0])<<24
+}
+
+func Uint64_littleEndian(b *[8]byte) uint64 {
+	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
+		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+}
+
+func Uint64_bigEndian(b *[8]byte) uint64 {
+	return uint64(b[7]) | uint64(b[6])<<8 | uint64(b[5])<<16 | uint64(b[4])<<24 |
+		uint64(b[3])<<32 | uint64(b[2])<<40 | uint64(b[1])<<48 | uint64(b[0])<<56
+}
+
+func ReadUnaligned32(p unsafe.Pointer) uint32 {
+	b := (*[4]byte)(p)
+	if !isLittleEndian() {
+		return Uint32_bigEndian(b)
+	}
+	return Uint32_littleEndian(b)
+}
+
+// //go:linkname readUnaligned64 runtime.readUnaligned64
+// func readUnaligned64(p unsafe.Pointer) uint64
+func ReadUnaligned64(p unsafe.Pointer) uint64 {
+	b := (*[8]byte)(p)
+	if !isLittleEndian() {
+		return Uint64_bigEndian(b)
+	}
+	return Uint64_littleEndian(b)
+}
+
 //go:noescape
 func GetG() unsafe.Pointer
 
