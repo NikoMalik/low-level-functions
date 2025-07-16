@@ -8,7 +8,6 @@ import (
 	"unsafe"
 
 	"github.com/NikoMalik/low-level-functions/example"
-	"github.com/NikoMalik/low-level-functions/mem"
 
 	"github.com/NikoMalik/low-level-functions/union"
 )
@@ -36,41 +35,42 @@ func TestUnsafePointerExtraction(t *testing.T) {
 
 }
 
-func BenchmarkDirtBytes(b *testing.B) {
-	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
-		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data = MallocSlice[byte](size, size)
-			}
-		})
-	}
-}
-
-func BenchmarkArrayBytes(b *testing.B) {
-	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
-		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data = MakeSlice[byte](size, size)
-			}
-		})
-	}
-}
+// func BenchmarkDirtBytes(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data = MallocSlice[byte](size, size)
+// 			}
+// 		})
+// 	}
+// }
+//
+// func BenchmarkArrayBytes(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data = MakeSlice[byte](size, size)
+// 			}
+// 		})
+// 	}
+// }
 
 func must[T any](v T, err int) T {
 
 	return v
 }
-func BenchmarkDirtSys(b *testing.B) {
-	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
-		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data = *(*[]byte)(must(mem.SysAlloc(size)))
-				mem.SysFree(data)
-			}
-		})
 
-	}
-}
+// func BenchmarkDirtSys(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data = *(*[]byte)(must(mem.SysAlloc(size)))
+// 				mem.SysFree(data)
+// 			}
+// 		})
+//
+// 	}
+// }
 
 // var mm *arena.Arena
 //
@@ -88,34 +88,34 @@ func BenchmarkDirtSys(b *testing.B) {
 //
 // }
 
-func BenchmarkDirtBytes_MakeNozero(b *testing.B) {
-	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
-		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data = MakeNoZero(size)
-			}
-		})
-	}
-}
+// func BenchmarkDirtBytes_MakeNozero(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data = MakeNoZero(size)
+// 			}
+// 		})
+// 	}
+// }
+//
+// func BenchmarkOriginBytes(b *testing.B) {
+// 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
+// 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
+// 			for i := 0; i < b.N; i++ {
+// 				data = make([]byte, size)
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkOriginBytes(b *testing.B) {
-	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
-		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data = make([]byte, size)
-			}
-		})
-	}
-}
-
-func BenchmarkMake(b *testing.B) {
-
-	b.Run("Make", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			data = make([]byte, 1000, 1000)
-		}
-	})
-}
+// func BenchmarkMake(b *testing.B) {
+//
+// 	b.Run("Make", func(b *testing.B) {
+// 		for i := 0; i < b.N; i++ {
+// 			data = make([]byte, 1000, 1000)
+// 		}
+// 	})
+// }
 
 func BenchmarkMutableString_SetString(b *testing.B) {
 	var m MutableString

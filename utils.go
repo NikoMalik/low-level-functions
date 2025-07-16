@@ -404,12 +404,14 @@ func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 			}
 		}
 
-		header := *(*reflect.SliceHeader)(unsafe.Pointer(&from))
-		header.Len = header.Len * int(minSize) / int(maxSize)
-		header.Cap = header.Cap * int(minSize) / int(maxSize)
-		result := *(*[]TTo)(unsafe.Pointer(&header))
+		newLen := len(from) * int(minSize) / int(maxSize)
+		newCap := cap(from) * int(minSize) / int(maxSize)
 
-		return result, nil
+		return *(*[]TTo)(unsafe.Pointer(&struct {
+			Data uintptr
+			Len  int
+			Cap  int
+		}{*(*uintptr)(unsafe.Pointer(&from)), newLen, newCap})), nil
 	} else {
 		if len(from)*int(maxSize)%int(minSize) != 0 {
 			return nil, &ErrorSizeUnmatch{
@@ -419,16 +421,18 @@ func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 			}
 		}
 
-		header := *(*reflect.SliceHeader)(unsafe.Pointer(&from))
-		header.Len = header.Len * int(maxSize) / int(minSize)
-		header.Cap = header.Cap * int(maxSize) / int(minSize)
-		result := *(*[]TTo)(unsafe.Pointer(&header))
+		newLen := len(from) * int(maxSize) / int(minSize)
+		newCap := cap(from) * int(maxSize) / int(minSize)
 
-		return result, nil
+		return *(*[]TTo)(unsafe.Pointer(&struct {
+			Data uintptr
+			Len  int
+			Cap  int
+		}{*(*uintptr)(unsafe.Pointer(&from)), newLen, newCap})), nil
+
 	}
 }
 
-//go:noinline
 func Swap[T any](a, b *T) {
 	tmp := *a
 	*a = *b
