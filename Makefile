@@ -2,4 +2,4 @@
 
 
 bench:
-	@go test  -benchmem    -benchtime=10s  -bench ./  
+	@go test  -benchmem  -bench ./  

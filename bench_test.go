@@ -35,6 +35,82 @@ func TestUnsafePointerExtraction(t *testing.T) {
 
 }
 
+func TestUnsafeCompare(t *testing.T) {
+
+	ss := "ss"
+	ff := "ff"
+	fmt.Println(CompareImpl(UnsafePointer(ss), UnsafePointer(ff), 2))
+
+	ss2 := "ss"
+
+	fmt.Println(CompareImpl(UnsafePointer(ss), UnsafePointer(ss2), 2))
+
+}
+
+func BenchmarkCompareImplAVX2_16(b *testing.B) {
+	a := make([]byte, 16)
+	bb := make([]byte, 16)
+	for i := 0; i < b.N; i++ {
+		_ = CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&bb[0]), 16)
+	}
+}
+
+func BenchmarkBytesEqual_16(b *testing.B) {
+	a := make([]byte, 16)
+	bb := make([]byte, 16)
+	for i := 0; i < b.N; i++ {
+		_ = bytes.Equal(a, bb)
+	}
+}
+
+func BenchmarkCompareImplAVX2_128(b *testing.B) {
+	a := make([]byte, 128)
+	bb := make([]byte, 128)
+	for i := 0; i < b.N; i++ {
+		_ = CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&bb[0]), 128)
+	}
+}
+
+func BenchmarkBytesEqual_128(b *testing.B) {
+	a := make([]byte, 128)
+	bb := make([]byte, 128)
+	for i := 0; i < b.N; i++ {
+		_ = bytes.Equal(a, bb)
+	}
+}
+
+func BenchmarkCompareImplAVX2_256(b *testing.B) {
+	a := make([]byte, 256)
+	bb := make([]byte, 256)
+	for i := 0; i < b.N; i++ {
+		_ = CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&bb[0]), 256)
+	}
+}
+
+func BenchmarkBytesEqual_256(b *testing.B) {
+	a := make([]byte, 256)
+	bb := make([]byte, 256)
+	for i := 0; i < b.N; i++ {
+		_ = bytes.Equal(a, bb)
+	}
+}
+
+func BenchmarkCompareImplAVX2_1024(b *testing.B) {
+	a := make([]byte, 1024)
+	bb := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		_ = CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&bb[0]), 1024)
+	}
+}
+
+func BenchmarkBytesEqual_1024(b *testing.B) {
+	a := make([]byte, 1024)
+	bb := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		_ = bytes.Equal(a, bb)
+	}
+}
+
 // func BenchmarkDirtBytes(b *testing.B) {
 // 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
 // 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {

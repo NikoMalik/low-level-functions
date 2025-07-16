@@ -376,6 +376,13 @@ func StringToBytes(s string) []byte {
 	}{*(*uintptr)(unsafe.Pointer(&s)), len(s), len(s)}))
 }
 
+func CompareSlice(a, b []byte, length int) bool {
+	if length > len(a) || length > len(b) {
+		return false
+	}
+	return CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&b[0]), length)
+}
+
 func CopyString(s string) string {
 	c := MakeNoZero(len(s))
 	copy(c, StringToBytes(s))
