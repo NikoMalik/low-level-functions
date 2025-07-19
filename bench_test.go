@@ -111,6 +111,22 @@ func BenchmarkBytesEqual_1024(b *testing.B) {
 	}
 }
 
+func BenchmarkCompareImplAVX2_10240(b *testing.B) {
+	a := make([]byte, 10240)
+	bb := make([]byte, 10240)
+	for i := 0; i < b.N; i++ {
+		_ = CompareImpl(unsafe.Pointer(&a[0]), unsafe.Pointer(&bb[0]), 1024)
+	}
+}
+
+func BenchmarkBytesEqual_10240(b *testing.B) {
+	a := make([]byte, 10240)
+	bb := make([]byte, 10240)
+	for i := 0; i < b.N; i++ {
+		_ = bytes.Equal(a, bb)
+	}
+}
+
 // func BenchmarkDirtBytes(b *testing.B) {
 // 	for size := block1kb; size < block1kb*20; size += block1kb * 2 {
 // 		b.Run(fmt.Sprintf("size=%dkb", size/block1kb), func(b *testing.B) {
