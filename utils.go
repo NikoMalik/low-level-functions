@@ -59,6 +59,20 @@ func ReadUnaligned32(p unsafe.Pointer) uint32 {
 	return Uint32_littleEndian(b)
 }
 
+//go:linkname memclrNoHeapPointers runtime.memclrNoHeapPointers
+func memclrNoHeapPointers(p unsafe.Pointer, n uintptr)
+
+// MemclrZero sets memory of slice to zero, assuming T has no heap pointers.
+// T MUST NOT contain any references (e.g. pointers, strings, slices, maps, funcs).
+func Memclr[T any](s []T) {
+	if len(s) == 0 {
+		return
+	}
+	size := unsafe.Sizeof(s[0]) * uintptr(len(s))
+	ptr := unsafe.Pointer(&s[0])
+	memclrNoHeapPointers(ptr, size)
+}
+
 // //go:linkname readUnaligned64 runtime.readUnaligned64
 // func readUnaligned64(p unsafe.Pointer) uint64
 func ReadUnaligned64(p unsafe.Pointer) uint64 {

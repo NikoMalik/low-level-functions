@@ -15,6 +15,94 @@ import (
 var block1kb = 1024
 var data []byte
 
+var zeroBuf = make([]byte, 4096)
+
+func stdClear(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}
+
+var sink byte
+var sink2 int64
+
+func BenchmarkMemclr(b *testing.B) {
+	buf := make([]byte, 64*1024)
+	b.SetBytes(int64(len(buf)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Memclr(buf)
+		sink ^= buf[0]
+	}
+}
+
+func BenchmarkStdClear(b *testing.B) {
+	buf := make([]byte, 64*1024)
+	b.SetBytes(int64(len(buf)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stdClear(buf)
+		sink ^= buf[0]
+	}
+}
+
+func BenchmarkMemclrInt64(b *testing.B) {
+	data := make([]int64, 8192) // 64 KiB
+	b.SetBytes(int64(len(data) * int(unsafe.Sizeof(data[0]))))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Memclr(data)
+		sink2 ^= data[0]
+
+	}
+}
+
+func BenchmarkStdClearInt64(b *testing.B) {
+	data := make([]int64, 8192)
+	b.SetBytes(int64(len(data) * int(unsafe.Sizeof(data[0]))))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for j := range data {
+			data[j] = 0
+		}
+		sink2 ^= data[0]
+	}
+}
+
+type SimpleStruct struct {
+	A int64
+	B float64
+	C bool
+}
+
+var sinkStruct SimpleStruct
+
+func stdClearStruct(s []SimpleStruct) {
+	for i := range s {
+		s[i] = SimpleStruct{}
+	}
+}
+
+func BenchmarkMemclrStruct(b *testing.B) {
+	data := make([]SimpleStruct, 8192) // 64 KiB
+	b.SetBytes(int64(len(data) * int(unsafe.Sizeof(data[0]))))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Memclr(data)
+		sinkStruct = data[0]
+	}
+}
+
+func BenchmarkStdClearStruct(b *testing.B) {
+	data := make([]SimpleStruct, 8192)
+	b.SetBytes(int64(len(data) * int(unsafe.Sizeof(data[0]))))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stdClearStruct(data)
+		sinkStruct = data[0]
+	}
+}
+
 func TestUnsafePointerExtraction(t *testing.T) {
 
 	var empty []byte
