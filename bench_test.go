@@ -3,6 +3,7 @@ package lowlevelfunctions
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"unsafe"
@@ -1158,7 +1159,7 @@ func BenchmarkNextPower2(b *testing.B) {
 
 	number1 := uintptr(49130)
 
-	b.Run("Default NextPowerOfTwo", func(b *testing.B) {
+	b.Run(" NextPowerOfTwo", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			number1 = NextPowerOfTwo(number1)
 		}
@@ -1166,6 +1167,28 @@ func BenchmarkNextPower2(b *testing.B) {
 
 }
 
+func BenchmarkLog2(b *testing.B) {
+	const inputUint = uintptr(49130)
+	const inputFlt = float64(49130)
+
+	b.Run("math.Log2(float64)", func(b *testing.B) {
+		var x float64
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			x = math.Log2(inputFlt)
+		}
+		_ = x
+	})
+
+	b.Run("Log2(uintptr)", func(b *testing.B) {
+		var x uintptr
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			x = Log2(inputUint)
+		}
+		_ = x
+	})
+}
 func TestUnion_SetInt64_GetInt64(t *testing.T) {
 	u := union.NewUnion[int64]()
 	val := int64(42)

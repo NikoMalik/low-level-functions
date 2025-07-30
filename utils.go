@@ -327,15 +327,14 @@ func string_b(b []byte) string {
 	return *(*string)(unsafe.Pointer(&h))
 }
 
-func String(b []byte) string {
+func string3(b []byte) string {
 	return *(*string)(unsafe.Pointer(&struct {
 		uintptr
 		int
 	}{*(*uintptr)(unsafe.Pointer(&b)), len(b)}))
 }
 
-func string3(b []byte) string {
-
+func String(b []byte) string {
 	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
@@ -378,11 +377,11 @@ func stringBytes(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&h))
 }
 
-func stringToBytes_(s string) []byte {
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s)), len(s))
+func StringToBytes(s string) []byte {
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
-func StringToBytes(s string) []byte {
+func stringToBytes_(s string) []byte {
 	return *(*[]byte)(unsafe.Pointer(&struct {
 		uintptr
 		int
