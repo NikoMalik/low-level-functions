@@ -136,6 +136,80 @@ func TestUnsafeCompare(t *testing.T) {
 
 }
 
+func equalSlice[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestSliceFill(t *testing.T) {
+	slice := make([]int, 5)
+	SliceFill(slice, 42, 1, 4)
+	expected := []int{0, 42, 42, 42, 0}
+	if !equalSlice(slice, expected) {
+		t.Errorf("SliceFill failed: expected %v, got %v", expected, slice)
+	}
+
+	slice = make([]int, 5)
+	SliceFill(slice, 42, 2, 2)
+	expected = []int{0, 0, 0, 0, 0}
+	if !equalSlice(slice, expected) {
+		t.Errorf("SliceFill failed: expected %v, got %v", expected, slice)
+	}
+
+	t.Run("invalid range", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("SliceFill did not panic on invalid range")
+			}
+		}()
+		slice := make([]int, 5)
+		SliceFill(slice, 42, 4, 6)
+	})
+}
+
+func BenchmarkSliceFill(b *testing.B) {
+	slice := make([]int, 1000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		SliceFill(slice, 42, 0, 1000)
+	}
+}
+
+func BenchmarkSliceFillStandard(b *testing.B) {
+	slice := make([]int, 1000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for j := range slice {
+			slice[j] = 42
+		}
+	}
+}
+
+func BenchmarkMemsetSlice(b *testing.B) {
+	slice := make([]int, 1000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		MemsetSlice(slice, 42)
+	}
+}
+
+func BenchmarkMemsetSliceStandard(b *testing.B) {
+	slice := make([]int, 1000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for j := range slice {
+			slice[j] = 42
+		}
+	}
+}
+
 func BenchmarkCompareImplAVX2_16(b *testing.B) {
 	a := make([]byte, 16)
 	bb := make([]byte, 16)

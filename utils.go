@@ -2,6 +2,7 @@ package lowlevelfunctions
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -81,6 +82,26 @@ func ReadUnaligned64(p unsafe.Pointer) uint64 {
 		return Uint64_bigEndian(b)
 	}
 	return Uint64_littleEndian(b)
+}
+
+func MemsetSlice[T any](s []T, value T) {
+	if len(s) == 0 {
+		return
+	}
+	s[0] = value
+	for i := 1; i < len(s); i *= 2 {
+		CopyUnsafe(s[i:], s[:i])
+	}
+}
+
+func SliceFill[T any](s []T, value T, start, end int) {
+	if start < 0 || end > len(s) || start > end {
+		panic(fmt.Sprintf("SliceFill: invalid range [%d:%d] for slice of length %d", start, end, len(s)))
+	}
+	if start == end {
+		return
+	}
+	MemsetSlice(s[start:end], value)
 }
 
 //go:noescape
@@ -173,6 +194,65 @@ func (m *MutableString) String() string {
 		return ""
 	}
 	return String(*m)
+}
+
+func (m *MutableString) SubString(start, end int) string {
+	if start < 0 || end > len(*m) || start > end {
+		panic("invalid substring range")
+	}
+	return unsafe.String(unsafe.SliceData((*m)[start:end]), end-start)
+}
+
+func (m *MutableString) SubSlice(start, end int) MutableString {
+	if start < 0 || end > len(*m) || start > end {
+		panic("invalid slice range")
+	}
+	return (*m)[start:end]
+}
+
+func (m *MutableString) Reserve(cp int) {
+	if cp > cap(*m) {
+		newBuf := MakeNoZeroCap(len(*m), cp)
+		copy(newBuf, *m)
+		*m = newBuf
+	}
+}
+
+func (m *MutableString) Shrink() {
+	if cap(*m) > len(*m) {
+		newBuf := MakeNoZero(len(*m))
+		copy(newBuf, *m)
+		*m = newBuf
+	}
+}
+
+func (m *MutableString) WriteUnaligned32(i int, v uint32) {
+	if i < 0 || i+4 > len(*m) {
+		panic("index out of range")
+	}
+	b := (*[4]byte)(unsafe.Pointer(&(*m)[i]))
+	if isLittleEndian() {
+		b[0], b[1], b[2], b[3] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24)
+	} else {
+		b[3], b[2], b[1], b[0] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24)
+	}
+}
+
+func (m *MutableString) AppendUnaligned32(v uint32) {
+	if len(*m) == 0 {
+		*m = MakeNoZeroCap(0, 4)
+	}
+	b := [4]byte{}
+	if isLittleEndian() {
+		b[0], b[1], b[2], b[3] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24)
+	} else {
+		b[3], b[2], b[1], b[0] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24)
+	}
+	*m = append(*m, b[:]...)
+}
+
+func (m *MutableString) WriteToBuffer(b io.Writer) (int, error) {
+	return b.Write(*m)
 }
 
 // ONLY FOR SHOW EXAMPLE
@@ -283,7 +363,7 @@ func memmove(dst, src unsafe.Pointer, n uintptr)
 // make([]byte, len(src)) not constant make([]byte, 0) constant
 //
 //go:nocheckptr
-func CopyUnsafe(dst []byte, src []byte) int {
+func CopyUnsafe[T any](dst []T, src []T) int {
 	memmove(unsafe.Pointer(&dst[0]), unsafe.Pointer(&src[0]), uintptr(len(src)))
 	return len(src)
 }
