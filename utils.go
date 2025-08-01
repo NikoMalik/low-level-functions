@@ -368,11 +368,24 @@ func CopyUnsafe[T any](dst []T, src []T) int {
 	return len(src)
 }
 
+// Noescape forces any pointerx not escape to the heap
+//
 //go:nosplit
 //go:nocheckptr
 func Noescape(up unsafe.Pointer) unsafe.Pointer {
 	x := uintptr(up)
 	return unsafe.Pointer(x ^ 0)
+}
+
+var alwaysFalse bool
+var escapeSink any
+
+// Escape forces any pointers in x to escape to the heap.
+func Escape[T any](x T) T {
+	if alwaysFalse {
+		escapeSink = x
+	}
+	return x
 }
 
 type ErrorSizeUnmatch struct {

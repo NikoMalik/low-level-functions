@@ -182,6 +182,14 @@ func BenchmarkSliceFill(b *testing.B) {
 	}
 }
 
+func TestEscape(t *testing.T) {
+	x := 42
+	fmt.Printf("Before: %p\n", &x)
+	y := Escape(x)
+	fmt.Printf("After: %p\n", &y)
+
+}
+
 func BenchmarkSliceFillStandard(b *testing.B) {
 	slice := make([]int, 1000)
 	b.ResetTimer()
