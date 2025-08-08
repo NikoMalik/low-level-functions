@@ -2,6 +2,7 @@ package lowlevelfunctions
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
@@ -91,6 +92,25 @@ func BenchmarkMemclrStruct(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Memclr(data)
 		sinkStruct = data[0]
+	}
+}
+
+func TestBytesToUint64Slice_ValidInput(t *testing.T) {
+	values := []uint64{0x1122334455667788, 0x99AABBCCDDEEFF00, 0x0123456789ABCDEF}
+	buf := new(bytes.Buffer)
+	for _, v := range values {
+		_ = binary.Write(buf, binary.LittleEndian, v)
+	}
+
+	result := BytesToUint64Slice(buf.Bytes())
+	if len(result) != len(values) {
+		t.Fatalf("expected length %d, got %d", len(values), len(result))
+	}
+
+	for i, v := range result {
+		if v != values[i] {
+			t.Errorf("index %d: expected 0x%X, got 0x%X", i, values[i], v)
+		}
 	}
 }
 

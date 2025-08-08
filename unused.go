@@ -2,11 +2,11 @@ package lowlevelfunctions
 
 import "unsafe"
 
-func new[T any](value T, size int) *T {
-	obj := (*T)(mallocgc(uintptr(size), nil, false))
-	*obj = value
-	return obj
-}
+// func new[T any](value T, size int) *T {
+// 	obj := (*T)(mallocgc(uintptr(size), nil, false))
+// 	*obj = value
+// 	return obj
+// }
 
 //go:linkname lock runtime.lock
 func lock(l *mutex)

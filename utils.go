@@ -747,6 +747,16 @@ func (a *AtomicCounter) Get() int32 {
 
 }
 
+func BytesToUint64Slice(b []byte) []uint64 {
+	if len(b) == 0 {
+		return nil
+	}
+	if len(b)%8 != 0 {
+		panic("BytesToUint64Slice: length of byte slice must be a multiple of 8")
+	}
+	return unsafe.Slice((*uint64)(unsafe.Pointer(unsafe.SliceData(b))), len(b)/8)
+}
+
 func GetItem[T any](slice []T, idx int) T { // experimental same performance as original
 
 	if len(slice) == 0 || idx < 0 || idx >= len(slice) {
