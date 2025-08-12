@@ -490,9 +490,12 @@ func CompareSlice(a, b []byte, length int) bool {
 }
 
 func CopyString(s string) string {
-	c := MakeNoZero(len(s))
-	copy(c, StringToBytes(s))
-	return String(c)
+	if len(s) == 0 {
+		return ""
+	}
+	b := make([]byte, len(s))
+	copy(b, s)
+	return unsafe.String(&b[0], len(b))
 }
 
 func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {

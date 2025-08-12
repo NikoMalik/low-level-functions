@@ -25,6 +25,28 @@ func stdClear(b []byte) {
 	}
 }
 
+var sk []byte
+
+func bs(s string) []byte {
+	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+func BenchmarkStdStringToBytes(b *testing.B) {
+	s := "Hello, this is a sample string for benchmarking."
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sk = []byte(s)
+	}
+}
+
+func BenchmarkUnsafeStringToBytes(b *testing.B) {
+	s := "Hello, this is a sample string for benchmarking."
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		sk = bs(s)
+	}
+}
+
 var sink byte
 var sink2 int64
 
