@@ -2,11 +2,13 @@ package lowlevelfunctions
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/NikoMalik/low-level-functions/example"
@@ -115,6 +117,186 @@ func BenchmarkMemclrStruct(b *testing.B) {
 		Memclr(data)
 		sinkStruct = data[0]
 	}
+}
+
+func TestContains(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []int32
+			value  int32
+			expect bool
+		}{
+			{"Empty", []int32{}, 42, false},
+			{"SingleFound", []int32{42}, 42, true},
+			{"SingleNotFound", []int32{41}, 42, false},
+			{"First", []int32{42, 43, 44}, 42, true},
+			{"Middle", []int32{41, 42, 43}, 42, true},
+			{"Last", []int32{41, 42, 43}, 43, true},
+			{"NotFound", []int32{41, 42, 43}, 44, false},
+			{"Negative", []int32{-1, -2, -3}, -2, true},
+			{"MinValue", []int32{math.MinInt32, 0}, math.MinInt32, true},
+			{"MaxValue", []int32{0, math.MaxInt32}, math.MaxInt32, true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("uint32", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []uint32
+			value  uint32
+			expect bool
+		}{
+			{"Zero", []uint32{0, 1, 2}, 0, true},
+			{"MaxValue", []uint32{0, math.MaxUint32}, math.MaxUint32, true},
+			{"NotFound", []uint32{1, 2, 3}, 4, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("float32", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []float32
+			value  float32
+			expect bool
+		}{
+			{"ExactMatch", []float32{1.1, 2.2, 3.3}, 2.2, true},
+			{"Precision", []float32{0.1 + 0.2}, 0.3, true},
+			{"NaN", []float32{float32(math.NaN())}, float32(math.NaN()), true},
+			{"Inf", []float32{float32(math.Inf(1))}, float32(math.Inf(1)), true},
+			{"NotFound", []float32{1.0, 2.0, 3.0}, 4.0, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("int64", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []int64
+			value  int64
+			expect bool
+		}{
+			{"LargeNumbers", []int64{10000000000, 20000000000}, 20000000000, true},
+			{"MinValue", []int64{math.MinInt64, 0}, math.MinInt64, true},
+			{"MaxValue", []int64{0, math.MaxInt64}, math.MaxInt64, true},
+			{"NotFound", []int64{1, 2, 3}, 4, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("uint64", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []uint64
+			value  uint64
+			expect bool
+		}{
+			{"Zero", []uint64{0, 1, 2}, 0, true},
+			{"MaxValue", []uint64{0, math.MaxUint64}, math.MaxUint64, true},
+			{"NotFound", []uint64{1, 2, 3}, 4, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("float64", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []float64
+			value  float64
+			expect bool
+		}{
+			{"ExactMatch", []float64{1.1, 2.2, 3.3}, 2.2, true},
+			{"Precision", []float64{0.1 + 0.2}, 0.3, true},
+			{"NaN", []float64{math.NaN()}, math.NaN(), true},
+			{"Inf", []float64{math.Inf(1)}, math.Inf(1), true},
+			{"NotFound", []float64{1.0, 2.0, 3.0}, 4.0, false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
+	t.Run("UnsupportedTypes", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			if Contains([]string{"a", "b", "c"}, "b", true) != true {
+				t.Error("Contains should work for strings via fallback")
+			}
+		})
+
+	})
+
+	t.Run("EdgeCases", func(t *testing.T) {
+		t.Run("LargeSlice", func(t *testing.T) {
+			slice := make([]int64, 1_000_000)
+			for i := range slice {
+				slice[i] = int64(i)
+			}
+
+			if !Contains(slice, int64(999_999), true) {
+				t.Error("Should find value in large slice")
+			}
+
+			if Contains(slice, int64(-1), true) {
+				t.Error("Should not find missing value")
+			}
+		})
+
+		t.Run("Alignment", func(t *testing.T) {
+			slice := []int32{1, 2, 3, 4, 5}
+			if !Contains(slice[1:], 5, true) {
+				t.Error("Should handle unaligned slices")
+			}
+		})
+
+		t.Run("CrossElement", func(t *testing.T) {
+			slice := []int32{0x11223344, 0x55667788}
+			if Contains(slice, 0x33445566, true) {
+				t.Error("Should not find cross-element values")
+			}
+		})
+	})
 }
 
 func TestBytesToUint64Slice_ValidInput(t *testing.T) {
@@ -274,6 +456,213 @@ func BenchmarkBytesEqual_16(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = bytes.Equal(a, bb)
 	}
+}
+
+func containsStd(slice [][]byte, value []byte) bool {
+	for _, v := range slice {
+		if bytes.Equal(v, value) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestContainsByteSliceAVX2(t *testing.T) {
+	tests := []struct {
+		name     string
+		slice    [][]byte
+		value    []byte
+		expected bool
+	}{
+		{
+			name:     "EmptySlice",
+			slice:    [][]byte{},
+			value:    []byte{1, 2, 3},
+			expected: false,
+		},
+		{
+			name:     "SingleElementFound",
+			slice:    [][]byte{{1, 2, 3}},
+			value:    []byte{1, 2, 3},
+			expected: true,
+		},
+		{
+			name:     "SingleElementNotFound",
+			slice:    [][]byte{{1, 2, 3}},
+			value:    []byte{4, 5, 6},
+			expected: false,
+		},
+		{
+			name:     "MultipleElements",
+			slice:    [][]byte{{1}, {2}, {3}, {4, 5}, make([]byte, 1024)},
+			value:    []byte{4, 5},
+			expected: true,
+		},
+		{
+			name:     "LargeElement",
+			slice:    [][]byte{bytes.Repeat([]byte{1}, 1000)},
+			value:    bytes.Repeat([]byte{1}, 1000),
+			expected: true,
+		},
+		{
+			name:     "DifferentLength",
+			slice:    [][]byte{{1, 2, 3, 4}},
+			value:    []byte{1, 2, 3},
+			expected: false,
+		},
+		{
+			name:     "NilElement",
+			slice:    [][]byte{nil, {1, 2, 3}},
+			value:    []byte{1, 2, 3},
+			expected: true,
+		},
+		{
+			name:     "EmptyValue",
+			slice:    [][]byte{{}, {1, 2, 3}},
+			value:    []byte{},
+			expected: true,
+		},
+		{
+			name:     "EmptyValueNotFound",
+			slice:    [][]byte{{1}, {2}, {3}},
+			value:    []byte{},
+			expected: false,
+		},
+		{
+			name:     "FirstElement",
+			slice:    [][]byte{{1, 2}, {3, 4}, {5, 6}},
+			value:    []byte{1, 2},
+			expected: true,
+		},
+		{
+			name:     "LastElement",
+			slice:    [][]byte{{1, 2}, {3, 4}, {5, 6}},
+			value:    []byte{5, 6},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slicePtr := unsafe.Pointer(unsafe.SliceData(tt.slice))
+			valuePtr := unsafe.Pointer(&tt.value)
+			result := containsByteSliceAVX2(
+				slicePtr,
+				len(tt.slice),
+				valuePtr,
+				len(tt.value),
+			)
+
+			if result != tt.expected {
+				t.Errorf("AVX2 implementation: expected %v, got %v", tt.expected, result)
+			}
+
+			resultGeneral := Contains(tt.slice, tt.value, true)
+			if resultGeneral != tt.expected {
+				t.Errorf("General implementation: expected %v, got %v", tt.expected, resultGeneral)
+			}
+		})
+	}
+
+	t.Run("Performance", func(t *testing.T) {
+		sizes := []struct {
+			sliceSize int
+			elemSize  int
+		}{
+			{100, 16},
+			{1000, 32},
+			{10000, 64},
+			{100000, 128},
+		}
+
+		for _, size := range sizes {
+			slice := make([][]byte, size.sliceSize)
+			for i := range slice {
+				slice[i] = make([]byte, size.elemSize)
+				rand.Read(slice[i])
+			}
+
+			target := make([]byte, size.elemSize)
+			rand.Read(target)
+			slice = append(slice, target)
+
+			startAVX2 := time.Now()
+			slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
+			valuePtr := unsafe.Pointer(&target)
+			containsByteSliceAVX2(
+				slicePtr,
+				len(slice),
+				valuePtr,
+				len(target),
+			)
+			avx2Time := time.Since(startAVX2)
+
+			startStd := time.Now()
+
+			containsStd(slice, target)
+			stdTime := time.Since(startStd)
+
+			t.Logf("Size: %6d x %4d bytes | AVX2: %10v | Std: %10v | Speedup: %.2fx",
+				size.sliceSize, size.elemSize,
+				avx2Time, stdTime,
+				float64(stdTime.Nanoseconds())/float64(avx2Time.Nanoseconds()),
+			)
+		}
+	})
+}
+
+func BenchmarkContainsByteSlice(b *testing.B) {
+	sizes := []struct {
+		sliceSize int
+		elemSize  int
+	}{
+		{100, 16},
+		{1000, 32},
+		{10000, 64},
+		{100000, 128},
+	}
+
+	for _, size := range sizes {
+		slice := make([][]byte, size.sliceSize)
+		for i := range slice {
+			slice[i] = make([]byte, size.elemSize)
+			rand.Read(slice[i])
+		}
+
+		target := make([]byte, size.elemSize)
+		rand.Read(target)
+		slice = append(slice, target)
+
+		b.Run(
+			benchName(size.sliceSize, size.elemSize),
+			func(b *testing.B) {
+				b.Run("Std", func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						containsStd(slice, target)
+					}
+				})
+
+				b.Run("AVX2", func(b *testing.B) {
+					b.ReportAllocs()
+					slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
+					valuePtr := unsafe.Pointer(&target)
+					for i := 0; i < b.N; i++ {
+						containsByteSliceAVX2(
+							slicePtr,
+							len(slice),
+							valuePtr,
+							len(target),
+						)
+					}
+				})
+			},
+		)
+	}
+}
+
+func benchName(sliceSize, elemSize int) string {
+	return fmt.Sprintf("%d_x_%d", sliceSize, elemSize)
 }
 
 func BenchmarkCompareImplAVX2_128(b *testing.B) {

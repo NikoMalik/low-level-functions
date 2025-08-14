@@ -1,6 +1,8 @@
 package lowlevelfunctions
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"reflect"
@@ -91,6 +93,92 @@ func MemsetSlice[T any](s []T, value T) {
 	s[0] = value
 	for i := 1; i < len(s); i *= 2 {
 		CopyUnsafe(s[i:], s[:i])
+	}
+}
+
+type ContainKey interface {
+	[]byte | string | int8 | uint8 | int16 | uint16 | int32 | uint32 | float32 |
+		int64 | uint64 | float64
+}
+
+// for strings its slow,only work for predifined types
+func Contains[T ContainKey](slice []T, value T, littleEndian bool) bool {
+	if len(slice) == 0 {
+		return false
+	}
+	switch v := any(value).(type) {
+	case int8, uint8:
+		data := unsafe.Slice(
+			(*byte)(unsafe.Pointer(unsafe.SliceData(slice))),
+			len(slice),
+		)
+		byteVal := *(*byte)(unsafe.Pointer(&value))
+		return bytes.Contains(data, []byte{byteVal})
+
+	case int16, uint16:
+		data := unsafe.Slice(
+			(*byte)(unsafe.Pointer(unsafe.SliceData(slice))),
+			len(slice)*2,
+		)
+		var buf [2]byte
+		if littleEndian {
+			binary.LittleEndian.PutUint16(buf[:], *(*uint16)(unsafe.Pointer(&value)))
+			return bytes.Contains(data, buf[:])
+		}
+		binary.BigEndian.PutUint16(buf[:], *(*uint16)(unsafe.Pointer(&value)))
+		return bytes.Contains(data, buf[:])
+
+	case int32, uint32, float32:
+		data := unsafe.Slice(
+			(*byte)(unsafe.Pointer(unsafe.SliceData(slice))),
+			len(slice)*4,
+		)
+		var buf [4]byte
+		if littleEndian {
+			binary.LittleEndian.PutUint32(buf[:], *(*uint32)(unsafe.Pointer(&value)))
+			return bytes.Contains(data, buf[:])
+		}
+		binary.BigEndian.PutUint32(buf[:], *(*uint32)(unsafe.Pointer(&value)))
+		return bytes.Contains(data, buf[:])
+
+	case int64, uint64, float64:
+		data := unsafe.Slice(
+			(*byte)(unsafe.Pointer(unsafe.SliceData(slice))),
+			len(slice)*8,
+		)
+		var buf [8]byte
+		if littleEndian {
+			binary.LittleEndian.PutUint64(buf[:], *(*uint64)(unsafe.Pointer(&value)))
+			return bytes.Contains(data, buf[:])
+
+		}
+		binary.BigEndian.PutUint64(buf[:], *(*uint64)(unsafe.Pointer(&value)))
+
+		return bytes.Contains(data, buf[:])
+
+	case string:
+		strSlice := *(*[]string)(unsafe.Pointer(&slice))
+		for _, s := range strSlice {
+			if s == v {
+				return true
+			}
+		}
+		return false
+
+	case []byte:
+		slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
+		sliceLen := len(slice)
+		valuePtr := unsafe.Pointer(&v)
+
+		return containsByteSliceAVX2(
+			slicePtr,
+			sliceLen,
+			valuePtr,
+			len(v),
+		)
+
+	default:
+		return false
 	}
 }
 
