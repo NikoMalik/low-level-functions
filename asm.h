@@ -155,7 +155,7 @@
 
 // shlq $n, reg → reg << n (mul 2ⁿ)
 //
-// shrq $n, reg → reg >> n (div на 2ⁿ)
+// shrq $n, reg → reg >> n (div 2ⁿ)
 
 // SIMD
 #define VMOV(src, dst) VMOVDQU src, dst

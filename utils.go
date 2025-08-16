@@ -106,7 +106,7 @@ func Contains[T ContainKey](slice []T, value T, littleEndian bool) bool {
 	if len(slice) == 0 {
 		return false
 	}
-	switch v := any(value).(type) {
+	switch any(*new(T)).(type) {
 	case int8, uint8:
 		data := unsafe.Slice(
 			(*byte)(unsafe.Pointer(unsafe.SliceData(slice))),
@@ -157,24 +157,28 @@ func Contains[T ContainKey](slice []T, value T, littleEndian bool) bool {
 		return bytes.Contains(data, buf[:])
 
 	case string:
-		strSlice := *(*[]string)(unsafe.Pointer(&slice))
-		for _, s := range strSlice {
-			if s == v {
-				return true
-			}
-		}
-		return false
+		slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
+		sliceLen := len(slice)
+		valuePtr := Noescape(unsafe.Pointer(&value))
+		value := *(*string)(Noescape(valuePtr))
+		return containsStringAVX2(
+			slicePtr,
+			sliceLen,
+			valuePtr,
+			len(value),
+		)
 
 	case []byte:
 		slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
 		sliceLen := len(slice)
-		valuePtr := unsafe.Pointer(&v)
+		valuePtr := Noescape(unsafe.Pointer(&value))
+		value := *(*[]byte)(Noescape(valuePtr))
 
 		return containsByteSliceAVX2(
 			slicePtr,
 			sliceLen,
 			valuePtr,
-			len(v),
+			len(value),
 		)
 
 	default:

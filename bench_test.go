@@ -306,6 +306,29 @@ func TestContains(t *testing.T) {
 		}
 	})
 
+	t.Run("string", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			slice  []string
+			value  string
+			expect bool
+		}{
+			{"ExactMatch", []string{"fkahfkajfka", "jfkajfka", "fjfkajfkjakfjakf"}, "jfkajfka", true},
+			{"NotFound", []string{"a", "b", "c"}, "d", false},
+			{"EmptySlice", []string{}, "any", false},
+			{"FirstElement", []string{"match", "other"}, "match", true},
+			{"LastElement", []string{"first", "second", "target"}, "target", true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if got := Contains(tt.slice, tt.value, true); got != tt.expect {
+					t.Errorf("Contains(%v, %v) = %v, want %v", tt.slice, tt.value, got, tt.expect)
+				}
+			})
+		}
+	})
+
 	t.Run("UnsupportedTypes", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
 			if Contains([]string{"a", "b", "c"}, "b", true) != true {
@@ -515,6 +538,15 @@ func containsStd(slice [][]byte, value []byte) bool {
 	return false
 }
 
+func containsStdString(slice []string, value string) bool {
+	for _, v := range slice {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
 func TestContainsByteSliceAVX2(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -657,6 +689,60 @@ func TestContainsByteSliceAVX2(t *testing.T) {
 			)
 		}
 	})
+}
+
+func BenchmarkContainsStringSlice(b *testing.B) {
+	sizes := []struct {
+		sliceSize int
+		elemSize  int
+	}{
+		{100, 16},
+		{1000, 32},
+		{10000, 64},
+		{100000, 128},
+	}
+
+	for _, size := range sizes {
+		slice := make([]string, size.sliceSize)
+		for i := range slice {
+			bs := make([]byte, size.elemSize)
+			rand.Read(bs)
+			slice[i] = string(bs)
+		}
+
+		targetBytes := make([]byte, size.elemSize)
+		rand.Read(targetBytes)
+		target := string(targetBytes)
+		slice = append(slice, target)
+
+		b.Run(
+			benchName(size.sliceSize, size.elemSize),
+			func(b *testing.B) {
+				b.Run("Std", func(b *testing.B) {
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						containsStdString(slice, target)
+					}
+				})
+
+				b.Run("AVX2", func(b *testing.B) {
+					b.ReportAllocs()
+					// slicePtr := unsafe.Pointer(unsafe.SliceData(slice))
+					// valuePtr := unsafe.Pointer(&target)
+					for i := 0; i < b.N; i++ {
+						Contains(slice, target, true)
+						// containsStringAVX2(
+						// 	slicePtr,
+						// 	len(slice),
+						// 	valuePtr,
+						// 	len(target),
+						// )
+					}
+				})
+
+			},
+		)
+	}
 }
 
 func BenchmarkContainsByteSlice(b *testing.B) {
