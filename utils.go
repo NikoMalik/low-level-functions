@@ -278,9 +278,6 @@ func Pointer(v interface{}) unsafe.Pointer {
 type MutableString []byte
 
 func (m *MutableString) String() string {
-	if len(*m) == 0 {
-		return ""
-	}
 	return String(*m)
 }
 
@@ -452,7 +449,17 @@ func memmove(dst, src unsafe.Pointer, n uintptr)
 //
 //go:nocheckptr
 func CopyUnsafe[T any](dst []T, src []T) int {
-	memmove(unsafe.Pointer(&dst[0]), unsafe.Pointer(&src[0]), uintptr(len(src)))
+	if len(dst) == 0 || len(src) == 0 {
+		return 0
+	}
+	if len(src) > len(dst) {
+		src = src[:len(dst)]
+	}
+	memmove(
+		unsafe.Pointer(unsafe.SliceData(dst)),
+		unsafe.Pointer(&src[0]),
+		uintptr(len(src))*unsafe.Sizeof(src[0]),
+	)
 	return len(src)
 }
 
