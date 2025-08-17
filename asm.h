@@ -7,7 +7,7 @@
 // I FUCKING HATE THIS DOT  (U+00B7)
 #define DOT ·
 
-// General-purpose registers (Plan 9 names and lowercase equivalents)
+// 64bit
 #define rax AX
 #define rbx BX
 #define rcx CX
@@ -24,6 +24,66 @@
 #define r13 R13
 #define r14 R14
 #define r15 R15
+
+// 32-bit
+#define eax AX
+#define ebx BX
+#define ecx CX
+#define edx DX
+#define esi SI
+#define edi DI
+#define ebp BP
+#define esp SP
+#define r8d R8L
+#define r9d R9L
+#define r10d R10L
+#define r11d R11L
+#define r12d R12L
+#define r13d R13L
+#define r14d R14L
+#define r15d R15L
+
+// 16-bit
+#define ax AX
+#define bx BX
+#define cx CX
+#define dx DX
+#define si SI
+#define di DI
+#define bp BP
+#define sp SP
+#define r8w R8W
+#define r9w R9W
+#define r10w R10W
+#define r11w R11W
+#define r12w R12W
+#define r13w R13W
+#define r14w R14W
+#define r15w R15W
+
+// 8-bit low
+#define al AL
+#define bl BL
+#define cl CL
+#define dl DL
+#define sil SIL
+#define dil DIL
+#define bpl BPL
+#define spl SPL
+#define r8b R8B
+#define r9b R9B
+#define r10b R10B
+#define r11b R11B
+#define r12b R12B
+#define r13b R13B
+#define r14b R14B
+#define r15b R15B
+
+// 8-bit high (only for AX..DX)
+#define ah AH
+#define bh BH
+#define ch CH
+#define dh DH
 
 // SIMD  (AVX-512)
 // #define Z0 Z0
@@ -105,7 +165,14 @@
 #define MUL(reg) MULQ reg
 #define DIV(reg) DIVQ reg
 #define INC(reg) INCQ reg
+// INC:: //for 64bit
+// MOVQ $0, AX   // rax = 0
+// INCQ AX       // rax = 1
+// INCQ AX       // rax = 2
 #define DEC(reg) DECQ reg
+// MOVQ $5, AX   // rax = 5
+// DECQ AX       // rax = 4
+// DECQ AX       // rax = 3
 #define NEG(reg) NEGQ reg
 
 #define DIV_SHRQ(req, number) SHRQ number, req
@@ -233,10 +300,14 @@
     CMPL reg, $0xFFFFFFFF; \
     JEQ
 
+#define IF_ZERO(req, label) \
+    TESTQ req, req;         \
+    JZ label;
+
 // check any incompare
-#define ANY_NEQ(reg)       \
-    CMPL reg, $0xFFFFFFFF; \
-    JNE
+#define ANY_NEQ(reg, label) \
+    CMPL reg, $0xFFFFFFFF;  \
+    JNE label
 
 #define RETURN_FALSE           \
     MOVB $0, ret + offset(FP); \
