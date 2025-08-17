@@ -375,3 +375,21 @@
 // Conditional move
 #define CMOVNE(src, dst) CMOVQNE src, dst
 #define CMOVEQ(src, dst) CMOVQEQ src, dst
+
+// name — name array
+// size — count array
+// val — value (byte)
+#define DEFINE_BYTE_ARRAY(name, size, val) \
+    GLOBL name(SB), RODATA, $size;         \
+    name:                                  \
+    REPT size                              \
+        BYTE $val                          \
+            END
+
+// array 64-bit word
+#define DEFINE_QWORD_ARRAY(name, size, val) \
+    GLOBL name(SB), RODATA, $(size * 8);    \
+    name:                                   \
+    REPT size                               \
+        DQ val                              \
+            END
