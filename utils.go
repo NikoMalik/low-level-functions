@@ -101,7 +101,7 @@ type ContainKey interface {
 		int64 | uint64 | float64
 }
 
-// for strings its slow,only work for predifined types
+// only work for predifined types
 func Contains[T ContainKey](slice []T, value T, littleEndian bool) bool {
 	if len(slice) == 0 {
 		return false
