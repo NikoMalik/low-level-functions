@@ -7,6 +7,7 @@
 // I FUCKING HATE THIS DOT  (U+00B7)
 #define DOT ·
 
+// RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R10, R11  (caller-saved)
 // 64bit
 #define rax AX
 #define rbx BX
@@ -179,6 +180,9 @@
 
 #define MUL_SHLQ(req, number) SHLQ number, req
 
+#define MUL2(reg) SHLQ $1, reg // mul  2
+#define DIV2(reg) SHRQ $1, reg // div 2
+
 // reg = reg * 8
 #define MUL8(reg) SHLQ $3, reg
 
@@ -304,6 +308,10 @@
     TESTQ req, req;         \
     JZ label;
 
+#define IF_NOT_ZERO(reg, label) \
+    TESTQ reg, reg;             \
+    JNZ label
+
 // check any incompare
 #define ANY_NEQ(reg, label) \
     CMPL reg, $0xFFFFFFFF;  \
@@ -393,3 +401,5 @@
     REPT size                               \
         DQ val                              \
             END
+
+#define GARR(base, idx, sz) base + ((idx) * (sz))(SB)

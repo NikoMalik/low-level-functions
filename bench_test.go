@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
+	mathrand "math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -27,10 +29,90 @@ func stdClear(b []byte) {
 	}
 }
 
+func makeRandom(size int) []byte {
+	src := make([]byte, size)
+	r := mathrand.New(mathrand.NewSource(42))
+	_, _ = r.Read(src)
+	return src
+}
+
 var sk []byte
 
 func bs(s string) []byte {
 	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+func TestEncodeCorrectness(t *testing.T) {
+	cases := [][]byte{
+		{},
+		{0x00},
+		{0x00, 0xff, 0x12, 0x7a},
+		makeRandom(64),
+		makeRandom(1024),
+	}
+
+	for idx, src := range cases {
+		dstStd := make([]byte, EncodedLen(len(src)))
+		dstB := make([]byte, EncodedLen(len(src)))
+
+		hex.Encode(dstStd, src)
+
+		EncodeUnrolled8(dstB, src)
+
+		if !bytes.Equal(dstStd, dstB) {
+			t.Fatalf("case %d: EncodeUnrolled8 produced wrong result\nexpected=%s\ngot     =%s", idx, string(dstStd), string(dstB))
+		}
+	}
+}
+
+func TestEncodeAgainstStdlibManyRandom(t *testing.T) {
+	for i := 0; i < 200; i++ {
+		n := mathrand.Intn(2048)
+		src := makeRandom(n)
+
+		std := make([]byte, EncodedLen(len(src)))
+		got := make([]byte, EncodedLen(len(src)))
+
+		hex.Encode(std, src)
+		EncodeUnrolled8(got, src)
+
+		if !bytes.Equal(std, got) {
+			t.Fatalf("random %d: EncodeUnrolled8 mismatch (len=%d)", i, n)
+		}
+	}
+}
+
+func BenchmarkEncodeVariants(b *testing.B) {
+	sizes := []int{16, 256, 4096}
+
+	for _, size := range sizes {
+		src := makeRandom(size)
+		dst := make([]byte, EncodedLen(len(src)))
+
+		// b.Run(fmt.Sprintf("Encode/%d", size), func(b *testing.B) {
+		// 	b.ReportAllocs()
+		// 	b.ResetTimer()
+		// 	for i := 0; i < b.N; i++ {
+		// 		_ = Encode(dst, src)
+		// 	}
+		// })
+
+		b.Run(fmt.Sprintf("Unrolled8/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = EncodeUnrolled8(dst, src)
+			}
+		})
+
+		b.Run(fmt.Sprintf("Stdlib/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				hex.Encode(dst, src)
+			}
+		})
+	}
 }
 
 func BenchmarkStdStringToBytes(b *testing.B) {

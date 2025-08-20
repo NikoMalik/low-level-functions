@@ -23,6 +23,60 @@ const (
 	MaxUintptr    = ^uintptr(0)
 )
 
+var hexTbl = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
+
+func EncodedLen(n int) int { return n * 2 }
+
+func EncodeUnrolled8(dst, src []byte) int {
+	n := len(src)
+	if n == 0 {
+		return 0
+	}
+	srcPtr := unsafe.Pointer(unsafe.SliceData(src))
+	dstPtr := unsafe.Pointer(unsafe.SliceData(dst))
+	j := 0
+	i := 0
+	t := &hexTbl
+	for ; i+8 <= n; i += 8 {
+		v0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+0)))
+		v1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		v2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+2)))
+		v3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+3)))
+		v4 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+4)))
+		v5 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+5)))
+		v6 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+6)))
+		v7 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+7)))
+
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+0))) = t[v0>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+1))) = t[v0&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+2))) = t[v1>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+3))) = t[v1&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+4))) = t[v2>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+5))) = t[v2&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+6))) = t[v3>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+7))) = t[v3&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+8))) = t[v4>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+9))) = t[v4&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+10))) = t[v5>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+11))) = t[v5&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+12))) = t[v6>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+13))) = t[v6&0x0f]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+14))) = t[v7>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+15))) = t[v7&0x0f]
+
+		j += 16
+	}
+
+	for ; i < n; i++ {
+		v := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j))) = t[v>>4]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+1))) = t[v&0x0f]
+		j += 2
+	}
+
+	return j
+}
+
 func MulUintptr(a, b uintptr) (uintptr, bool) {
 	if a|b < 1<<(4*PtrSize) || a == 0 {
 		return a * b, false
@@ -597,6 +651,12 @@ func CopyString(s string) string {
 	return unsafe.String(&b[0], len(b))
 }
 
+func Swap[T any](a, b *T) {
+	tmp := *a
+	*a = *b
+	*b = tmp
+}
+
 func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 	var (
 		zeroValFrom TFrom
@@ -646,12 +706,6 @@ func ConvertSlice[TFrom, TTo any](from []TFrom) ([]TTo, error) {
 		}{*(*uintptr)(unsafe.Pointer(&from)), newLen, newCap})), nil
 
 	}
-}
-
-func Swap[T any](a, b *T) {
-	tmp := *a
-	*a = *b
-	*b = tmp
 }
 
 //go:linkname mallocgc runtime.mallocgc
