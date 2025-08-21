@@ -42,6 +42,178 @@ func bs(s string) []byte {
 	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
+func TestDecodeCorrectness(t *testing.T) {
+	cases := [][]byte{
+		{},           // Empty input
+		{0x34, 0x35}, // "45" -> 0x45
+		{0x30, 0x30, 0x66, 0x66, 0x31, 0x32, 0x37, 0x61}, // "00ff127a" -> 0x00, 0xff, 0x12, 0x7a
+		makeRandom(64),   // Random 64-byte input (hex-encoded)
+		makeRandom(1024), // Random 1024-byte input (hex-encoded)
+	}
+
+	for idx, srcRaw := range cases {
+		// Encode the raw bytes to hex for decoding
+		src := make([]byte, hex.EncodedLen(len(srcRaw)))
+		hex.Encode(src, srcRaw)
+
+		dstStd := make([]byte, hex.DecodedLen(len(src)))
+		dstUnrolled := make([]byte, hex.DecodedLen(len(src)))
+
+		_, errStd := hex.Decode(dstStd, src)
+		if errStd != nil {
+			t.Fatalf("case %d: stdlib hex.Decode failed: %v", idx, errStd)
+		}
+
+		n := DecodeUnrolled8(dstUnrolled, src)
+		if n != len(dstStd) {
+			t.Fatalf("case %d: DecodeUnrolled8 wrote %d bytes, expected %d", idx, n, len(dstStd))
+		}
+		if !bytes.Equal(dstStd, dstUnrolled) {
+			t.Fatalf("case %d: DecodeUnrolled8 produced wrong result\nexpected=%x\ngot     =%x", idx, dstStd, dstUnrolled)
+		}
+	}
+
+	// // Test invalid inputs
+	// invalidCases := [][]byte{
+	// 	{0x67, 0x67},       // "gg" -> invalid hex
+	// 	{0x34, 0x35, 0x36}, // "456" -> odd length
+	// }
+	// for idx, src := range invalidCases {
+	// 	dst := make([]byte, hex.DecodedLen(len(src)))
+	// 	_, err := DecodeUnrolled8(dst, src)
+	// 	if err == nil {
+	// 		t.Fatalf("invalid case %d: expected error, got none", idx)
+	// 	}
+	// }
+}
+
+func TestValidateHexFast(t *testing.T) {
+	tests := []struct {
+		input   []byte
+		wantErr error
+	}{
+		{[]byte{}, nil},
+		{[]byte("45"), nil},
+		{[]byte("00ff127a"), nil},
+		{[]byte("gg"), InvalidByteError('g')},
+		{[]byte("456"), ErrLength},
+		{[]byte("4g"), InvalidByteError('g')},
+		{[]byte("abcdef0123456789"), nil},
+		{[]byte("@!"), InvalidByteError('@')}, //'@'
+	}
+
+	for i, tt := range tests {
+		err := ValidateHex(tt.input)
+		if err != tt.wantErr {
+			t.Errorf("case %d: ValidateHexFast(%q) = %v; want %v", i, tt.input, err, tt.wantErr)
+		}
+	}
+
+	srcRaw := makeRandom(1024)
+	src := make([]byte, hex.EncodedLen(len(srcRaw)))
+	hex.Encode(src, srcRaw)
+	if err := ValidateHex(src); err != nil {
+		t.Errorf("ValidateHexFast failed on valid random input: %v", err)
+	}
+}
+
+func TestDecodeAgainstStdlibManyRandom(t *testing.T) {
+	for i := 0; i < 200; i++ {
+		n := mathrand.Intn(2048)
+		if n%2 == 1 {
+			n++ // Ensure even length for valid hex
+		}
+		srcRaw := makeRandom(n / 2)
+		src := make([]byte, n)
+		hex.Encode(src, srcRaw)
+
+		std := make([]byte, hex.DecodedLen(len(src)))
+		got := make([]byte, hex.DecodedLen(len(src)))
+		got2 := make([]byte, hex.DecodedLen(len(src)))
+
+		_, errStd := hex.Decode(std, src)
+		if errStd != nil {
+			t.Fatalf("random %d: stdlib hex.Decode failed: %v", i, errStd)
+		}
+
+		nGot := DecodeUnrolled8(got, src)
+		if nGot != len(std) {
+			t.Fatalf("random %d: DecodeUnrolled8 wrote %d bytes, expected %d", i, nGot, len(std))
+		}
+		nnGot, err := DecodeUnrolled8Checks(got2, src)
+		if err != nil {
+			t.Fatalf("random %d: decode unrolled failed: %v", i, err)
+		}
+
+		if nnGot != len(std) {
+			t.Fatalf("random %d: DecodeUnrolled8Checks wrote %d bytes, expected %d", i, nGot, len(std))
+		}
+
+		if !bytes.Equal(std, got) {
+			t.Fatalf("random %d: DecodeUnrolled8 mismatch (len=%d)", i, n)
+		}
+
+		if !bytes.Equal(std, got2) {
+			t.Fatalf("random %d: DecodeUnrolled8Checks mismatch (len=%d)", i, n)
+		}
+
+	}
+}
+
+func BenchmarkDecodeVariants(b *testing.B) {
+	sizes := []int{16, 256, 4096}
+
+	for _, size := range sizes {
+		srcRaw := makeRandom(size / 2)
+		src := make([]byte, size)
+		hex.Encode(src, srcRaw)
+		dst := make([]byte, hex.DecodedLen(len(src)))
+
+		b.Run(fmt.Sprintf("Unrolled8/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = DecodeUnrolled8(dst, src)
+			}
+		})
+
+		b.Run(fmt.Sprintf("ValidateHex+DecodeUnrolled8/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := ValidateHex(src); err == nil {
+					_ = DecodeUnrolled8(dst, src)
+				}
+			}
+		})
+
+		b.Run(fmt.Sprintf("DecodeUnrolled8WithChecks/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = DecodeUnrolled8Checks(dst, src)
+
+			}
+		})
+
+		b.Run(fmt.Sprintf("Unrolled16/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = DecodeUnrolled16(dst, src)
+			}
+		})
+
+		b.Run(fmt.Sprintf("Stdlib/%d", size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = hex.Decode(dst, src)
+			}
+		})
+	}
+}
+
 func TestEncodeCorrectness(t *testing.T) {
 	cases := [][]byte{
 		{},

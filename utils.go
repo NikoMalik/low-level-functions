@@ -3,6 +3,7 @@ package lowlevelfunctions
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -25,7 +26,377 @@ const (
 
 var hexTbl = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
 
+var reverseHexTable = []byte(
+	"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\xff\xff\xff\xff\xff\xff" +
+		"\xff\x0a\x0b\x0c\x0d\x0e\x0f\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\x0a\x0b\x0c\x0d\x0e\x0f\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+)
+
+type InvalidByteError byte
+
+func (e InvalidByteError) Error() string {
+	return "invalid byte: " + string(e)
+}
+
+var ErrLength = errors.New("invalid hex string length")
+
 func EncodedLen(n int) int { return n * 2 }
+
+func DecodeUnrolled16(dst, src []byte) (int, error) { // with checks
+	n := len(src)
+	if n == 0 {
+		return 0, nil
+	}
+	if n%2 == 1 {
+		if reverseHexTable[src[n-1]] > 0x0f {
+			return 0, InvalidByteError(src[n-1])
+		}
+		return 0, ErrLength
+	}
+
+	srcPtr := unsafe.Pointer(unsafe.SliceData(src))
+	dstPtr := unsafe.Pointer(unsafe.SliceData(dst))
+	t := &reverseHexTable
+	i := 0
+	j := 0
+
+	for ; i+16 <= n; i += 16 {
+		p0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+0)))
+		q0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		p1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+2)))
+		q1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+3)))
+		p2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+4)))
+		q2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+5)))
+		p3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+6)))
+		q3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+7)))
+		p4 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+8)))
+		q4 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+9)))
+		p5 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+10)))
+		q5 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+11)))
+		p6 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+12)))
+		q6 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+13)))
+		p7 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+14)))
+		q7 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+15)))
+
+		a0 := (*t)[p0]
+		b0 := (*t)[q0]
+		if a0 > 0x0f {
+			return j, InvalidByteError(p0)
+		}
+		if b0 > 0x0f {
+			return j, InvalidByteError(q0)
+		}
+		a1 := (*t)[p1]
+		b1 := (*t)[q1]
+		if a1 > 0x0f {
+			return j, InvalidByteError(p1)
+		}
+		if b1 > 0x0f {
+			return j, InvalidByteError(q1)
+		}
+		a2 := (*t)[p2]
+		b2 := (*t)[q2]
+		if a2 > 0x0f {
+			return j, InvalidByteError(p2)
+		}
+		if b2 > 0x0f {
+			return j, InvalidByteError(q2)
+		}
+		a3 := (*t)[p3]
+		b3 := (*t)[q3]
+		if a3 > 0x0f {
+			return j, InvalidByteError(p3)
+		}
+		if b3 > 0x0f {
+			return j, InvalidByteError(q3)
+		}
+		a4 := (*t)[p4]
+		b4 := (*t)[q4]
+		if a4 > 0x0f {
+			return j, InvalidByteError(p4)
+		}
+		if b4 > 0x0f {
+			return j, InvalidByteError(q4)
+		}
+		a5 := (*t)[p5]
+		b5 := (*t)[q5]
+		if a5 > 0x0f {
+			return j, InvalidByteError(p5)
+		}
+		if b5 > 0x0f {
+			return j, InvalidByteError(q5)
+		}
+		a6 := (*t)[p6]
+		b6 := (*t)[q6]
+		if a6 > 0x0f {
+			return j, InvalidByteError(p6)
+		}
+		if b6 > 0x0f {
+			return j, InvalidByteError(q6)
+		}
+		a7 := (*t)[p7]
+		b7 := (*t)[q7]
+		if a7 > 0x0f {
+			return j, InvalidByteError(p7)
+		}
+		if b7 > 0x0f {
+			return j, InvalidByteError(q7)
+		}
+
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+0))) = (a0 << 4) | b0
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+1))) = (a1 << 4) | b1
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+2))) = (a2 << 4) | b2
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+3))) = (a3 << 4) | b3
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+4))) = (a4 << 4) | b4
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+5))) = (a5 << 4) | b5
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+6))) = (a6 << 4) | b6
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+7))) = (a7 << 4) | b7
+
+		j += 8
+	}
+
+	for ; i < n; i += 2 {
+		p := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		q := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+
+		a := (*t)[p]
+		b := (*t)[q]
+		if a > 0x0f {
+			return j, InvalidByteError(p)
+		}
+		if b > 0x0f {
+			return j, InvalidByteError(q)
+		}
+
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j))) = (a << 4) | b
+		j++
+	}
+
+	return j, nil
+}
+
+// ValidateHex checks if src is a valid hex string (contains only 0-9, a-f, A-F and has even length).
+func ValidateHex(src []byte) error {
+	if len(src)%2 == 1 {
+		if reverseHexTable[src[len(src)-1]] > 0x0f {
+			return InvalidByteError(src[len(src)-1])
+		}
+		return ErrLength
+	}
+
+	srcPtr := unsafe.Pointer(unsafe.SliceData(src))
+	t := &reverseHexTable
+	i := 0
+
+	for ; i+8 <= len(src); i += 8 {
+		p0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		p1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		p2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+2)))
+		p3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+3)))
+		p4 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+4)))
+		p5 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+5)))
+		p6 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+6)))
+		p7 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+7)))
+
+		a0 := (*t)[p0]
+		a1 := (*t)[p1]
+		a2 := (*t)[p2]
+		a3 := (*t)[p3]
+		a4 := (*t)[p4]
+		a5 := (*t)[p5]
+		a6 := (*t)[p6]
+		a7 := (*t)[p7]
+
+		if (a0 | a1 | a2 | a3 | a4 | a5 | a6 | a7) > 0x0f {
+			if a0 > 0x0f {
+				return InvalidByteError(p0)
+			}
+			if a1 > 0x0f {
+				return InvalidByteError(p1)
+			}
+			if a2 > 0x0f {
+				return InvalidByteError(p2)
+			}
+			if a3 > 0x0f {
+				return InvalidByteError(p3)
+			}
+			if a4 > 0x0f {
+				return InvalidByteError(p4)
+			}
+			if a5 > 0x0f {
+				return InvalidByteError(p5)
+			}
+			if a6 > 0x0f {
+				return InvalidByteError(p6)
+			}
+			if a7 > 0x0f {
+				return InvalidByteError(p7)
+			}
+		}
+	}
+
+	for ; i < len(src); i++ {
+		p := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		if (*t)[p] > 0x0f {
+			return InvalidByteError(p)
+		}
+	}
+
+	return nil
+}
+
+// safety decode with checks
+func DecodeUnrolled8Checks(dst, src []byte) (int, error) {
+	n := len(src)
+	if n == 0 {
+		return 0, nil
+	}
+	if n%2 == 1 {
+		if reverseHexTable[src[n-1]] > 0x0f {
+			return 0, InvalidByteError(src[n-1])
+		}
+		return 0, ErrLength
+	}
+
+	srcPtr := unsafe.Pointer(unsafe.SliceData(src))
+	dstPtr := unsafe.Pointer(unsafe.SliceData(dst))
+	t := &reverseHexTable
+	i := 0
+	j := 0
+
+	for ; i+8 <= n; i += 8 {
+		p0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+0)))
+		q0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		p1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+2)))
+		q1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+3)))
+		p2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+4)))
+		q2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+5)))
+		p3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+6)))
+		q3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+7)))
+
+		a0 := (*t)[p0]
+		b0 := (*t)[q0]
+		a1 := (*t)[p1]
+		b1 := (*t)[q1]
+		a2 := (*t)[p2]
+		b2 := (*t)[q2]
+		a3 := (*t)[p3]
+		b3 := (*t)[q3]
+
+		if (a0 | b0 | a1 | b1 | a2 | b2 | a3 | b3) > 0x0f {
+			if a0 > 0x0f {
+				return j, InvalidByteError(p0)
+			}
+			if b0 > 0x0f {
+				return j, InvalidByteError(q0)
+			}
+			if a1 > 0x0f {
+				return j, InvalidByteError(p1)
+			}
+			if b1 > 0x0f {
+				return j, InvalidByteError(q1)
+			}
+			if a2 > 0x0f {
+				return j, InvalidByteError(p2)
+			}
+			if b2 > 0x0f {
+				return j, InvalidByteError(q2)
+			}
+			if a3 > 0x0f {
+				return j, InvalidByteError(p3)
+			}
+			if b3 > 0x0f {
+				return j, InvalidByteError(q3)
+			}
+		}
+
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+0))) = (a0 << 4) | b0
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+1))) = (a1 << 4) | b1
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+2))) = (a2 << 4) | b2
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+3))) = (a3 << 4) | b3
+
+		j += 4
+	}
+
+	for ; i < n; i += 2 {
+		p := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		q := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+
+		a := (*t)[p]
+		b := (*t)[q]
+		if a > 0x0f {
+			return j, InvalidByteError(p)
+		}
+		if b > 0x0f {
+			return j, InvalidByteError(q)
+		}
+
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j))) = (a << 4) | b
+		j++
+	}
+
+	return j, nil
+}
+
+// based, must be correct hex,no checks
+func DecodeUnrolled8(dst, src []byte) int {
+	n := len(src)
+	if n == 0 {
+		return 0
+	}
+	srcPtr := unsafe.Pointer(unsafe.SliceData(src))
+	dstPtr := unsafe.Pointer(unsafe.SliceData(dst))
+	t := &reverseHexTable
+	i := 0
+	j := 0
+	for ; i+8 <= n; i += 8 {
+		p0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+0)))
+		q0 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		p1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+2)))
+		q1 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+3)))
+		p2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+4)))
+		q2 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+5)))
+		p3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+6)))
+		q3 := *(*byte)(unsafe.Add(srcPtr, uintptr(i+7)))
+		a0 := (*t)[p0]
+		b0 := (*t)[q0]
+		a1 := (*t)[p1]
+		b1 := (*t)[q1]
+		a2 := (*t)[p2]
+		b2 := (*t)[q2]
+		a3 := (*t)[p3]
+		b3 := (*t)[q3]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+0))) = (a0 << 4) | b0
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+1))) = (a1 << 4) | b1
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+2))) = (a2 << 4) | b2
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j+3))) = (a3 << 4) | b3
+		j += 4
+	}
+
+	for ; i < n; i += 2 {
+		p := *(*byte)(unsafe.Add(srcPtr, uintptr(i)))
+		q := *(*byte)(unsafe.Add(srcPtr, uintptr(i+1)))
+		a := (*t)[p]
+		b := (*t)[q]
+		*(*byte)(unsafe.Add(dstPtr, uintptr(j))) = (a << 4) | b
+		j++
+	}
+
+	return j
+}
 
 func EncodeUnrolled8(dst, src []byte) int {
 	n := len(src)
