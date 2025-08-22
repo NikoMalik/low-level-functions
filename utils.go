@@ -51,6 +51,8 @@ func (e InvalidByteError) Error() string {
 	return "invalid byte: " + string(e)
 }
 
+var ErrInvalidFormat = errors.New("invalid format")
+
 var ErrLength = errors.New("invalid hex string length")
 
 func EncodedLen(n int) int { return n * 2 }
@@ -870,6 +872,78 @@ type Slice_t struct {
 	Cap  int
 }
 
+// 10
+func ParseInt(b []byte) (int64, error) {
+	if len(b) == 0 {
+		return 0, ErrInvalidFormat
+	}
+
+	result := int64(0)
+	ptr := unsafe.Pointer(unsafe.SliceData(b))
+	n := len(b)
+	i := 0
+
+	for ; i+8 <= n; i += 8 {
+		c0 := *(*byte)(unsafe.Add(ptr, uintptr(i)))
+		c1 := *(*byte)(unsafe.Add(ptr, uintptr(i+1)))
+		c2 := *(*byte)(unsafe.Add(ptr, uintptr(i+2)))
+		c3 := *(*byte)(unsafe.Add(ptr, uintptr(i+3)))
+		c4 := *(*byte)(unsafe.Add(ptr, uintptr(i+4)))
+		c5 := *(*byte)(unsafe.Add(ptr, uintptr(i+5)))
+		c6 := *(*byte)(unsafe.Add(ptr, uintptr(i+6)))
+		c7 := *(*byte)(unsafe.Add(ptr, uintptr(i+7)))
+
+		valid := (c0 - '0') | (c1 - '0') | (c2 - '0') | (c3 - '0') |
+			(c4 - '0') | (c5 - '0') | (c6 - '0') | (c7 - '0')
+		if valid > 9 {
+			if c0 < '0' || c0 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c1 < '0' || c1 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c2 < '0' || c2 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c3 < '0' || c3 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c4 < '0' || c4 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c5 < '0' || c5 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c6 < '0' || c6 > '9' {
+				return 0, ErrInvalidFormat
+			}
+			if c7 < '0' || c7 > '9' {
+				return 0, ErrInvalidFormat
+			}
+		}
+
+		result = result*100000000 +
+			int64(c0-'0')*10000000 +
+			int64(c1-'0')*1000000 +
+			int64(c2-'0')*100000 +
+			int64(c3-'0')*10000 +
+			int64(c4-'0')*1000 +
+			int64(c5-'0')*100 +
+			int64(c6-'0')*10 +
+			int64(c7-'0')
+	}
+
+	for ; i < n; i++ {
+		c := *(*byte)(unsafe.Add(ptr, uintptr(i)))
+		if c < '0' || c > '9' {
+			return 0, ErrInvalidFormat
+		}
+		result = result*10 + int64(c-'0')
+	}
+
+	return result, nil
+}
+
 //go:linkname memmove runtime.memmove
 func memmove(dst, src unsafe.Pointer, n uintptr)
 
@@ -886,7 +960,7 @@ func CopyUnsafe[T any](dst []T, src []T) int {
 	}
 	memmove(
 		unsafe.Pointer(unsafe.SliceData(dst)),
-		unsafe.Pointer(&src[0]),
+		unsafe.Pointer(unsafe.SliceData(src)),
 		uintptr(len(src))*unsafe.Sizeof(src[0]),
 	)
 	return len(src)
