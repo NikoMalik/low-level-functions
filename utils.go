@@ -16,12 +16,16 @@ import (
 )
 
 const (
-	PtrSize       = 4 << (^uintptr(0) >> 63)
-	StrSize       = unsafe.Sizeof("")
-	SliceSize     = int(unsafe.Sizeof([]byte{}))
-	CacheLineSize = constants.CacheLinePadSize
-	MaxInt32      = 1<<31 - 1
-	MaxUintptr    = ^uintptr(0)
+	PtrSize                = 4 << (^uintptr(0) >> 63)
+	StrSize                = unsafe.Sizeof("")
+	SliceSize              = int(unsafe.Sizeof([]byte{}))
+	CacheLineSize          = constants.CacheLinePadSize
+	MaxInt32               = 1<<31 - 1
+	MaxUintptr             = ^uintptr(0)
+	minSizeForMallocHeader = PtrSize * ptrBits
+	ptrBits                = 8 * PtrSize
+	_PageSize              = 1 << _PageShift
+	_PageMask              = _PageSize - 1
 )
 
 var hexTbl = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
@@ -1165,6 +1169,12 @@ func MakeNoZeroCap(l int, c int) []byte {
 	return MakeNoZero(c)[:l]
 }
 
+func AlignedAlloc(size, align uintptr) unsafe.Pointer {
+	addr := mallocgc(Roundupsize(NextPowerOfTwo(size+align), false), nil, false)
+	offset := align - uintptr(addr)%align
+	return unsafe.Pointer(uintptr(addr) + offset)
+}
+
 type StringBuffer struct {
 	buf []byte
 }
@@ -1403,6 +1413,89 @@ func Log2(i uintptr) (n uintptr) {
 	// Use the lookup table to determine the position of the highest bit.
 	return uintptr(tab64[((i-(i>>1))*0x07EDD5E59A4E28C2)>>58])
 
+}
+
+func IsPowerOfTwo(x uintptr) bool {
+	return x&(x-1) == 0
+}
+
+// Bswap64 returns its input with byte order reversed
+// 0x0102030405060708 -> 0x0807060504030201
+func Bswap64(x uint64) uint64 {
+	c8 := uint64(0x00ff00ff00ff00ff)
+	a := x >> 8 & c8
+	b := (x & c8) << 8
+	x = a | b
+	c16 := uint64(0x0000ffff0000ffff)
+	a = x >> 16 & c16
+	b = (x & c16) << 16
+	x = a | b
+	c32 := uint64(0x00000000ffffffff)
+	a = x >> 32 & c32
+	b = (x & c32) << 32
+	x = a | b
+	return x
+}
+
+const (
+	minHeapAlign    = 8
+	_MaxSmallSize   = 32768
+	smallSizeDiv    = 8
+	smallSizeMax    = 1024
+	largeSizeDiv    = 128
+	_NumSizeClasses = 68
+	_PageShift      = 13
+	maxObjsPerSpan  = 1024
+)
+
+var class_to_size = [_NumSizeClasses]uint16{0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 352, 384, 416, 448, 480, 512, 576, 640, 704, 768, 896, 1024, 1152, 1280, 1408, 1536, 1792, 2048, 2304, 2688, 3072, 3200, 3456, 4096, 4864, 5376, 6144, 6528, 6784, 6912, 8192, 9472, 9728, 10240, 10880, 12288, 13568, 14336, 16384, 18432, 19072, 20480, 21760, 24576, 27264, 28672, 32768}
+var class_to_allocnpages = [_NumSizeClasses]uint8{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 3, 2, 3, 1, 3, 2, 3, 4, 5, 6, 1, 7, 6, 5, 4, 3, 5, 7, 2, 9, 7, 5, 8, 3, 10, 7, 4}
+var class_to_divmagic = [_NumSizeClasses]uint32{0, ^uint32(0)/8 + 1, ^uint32(0)/16 + 1, ^uint32(0)/24 + 1, ^uint32(0)/32 + 1, ^uint32(0)/48 + 1, ^uint32(0)/64 + 1, ^uint32(0)/80 + 1, ^uint32(0)/96 + 1, ^uint32(0)/112 + 1, ^uint32(0)/128 + 1, ^uint32(0)/144 + 1, ^uint32(0)/160 + 1, ^uint32(0)/176 + 1, ^uint32(0)/192 + 1, ^uint32(0)/208 + 1, ^uint32(0)/224 + 1, ^uint32(0)/240 + 1, ^uint32(0)/256 + 1, ^uint32(0)/288 + 1, ^uint32(0)/320 + 1, ^uint32(0)/352 + 1, ^uint32(0)/384 + 1, ^uint32(0)/416 + 1, ^uint32(0)/448 + 1, ^uint32(0)/480 + 1, ^uint32(0)/512 + 1, ^uint32(0)/576 + 1, ^uint32(0)/640 + 1, ^uint32(0)/704 + 1, ^uint32(0)/768 + 1, ^uint32(0)/896 + 1, ^uint32(0)/1024 + 1, ^uint32(0)/1152 + 1, ^uint32(0)/1280 + 1, ^uint32(0)/1408 + 1, ^uint32(0)/1536 + 1, ^uint32(0)/1792 + 1, ^uint32(0)/2048 + 1, ^uint32(0)/2304 + 1, ^uint32(0)/2688 + 1, ^uint32(0)/3072 + 1, ^uint32(0)/3200 + 1, ^uint32(0)/3456 + 1, ^uint32(0)/4096 + 1, ^uint32(0)/4864 + 1, ^uint32(0)/5376 + 1, ^uint32(0)/6144 + 1, ^uint32(0)/6528 + 1, ^uint32(0)/6784 + 1, ^uint32(0)/6912 + 1, ^uint32(0)/8192 + 1, ^uint32(0)/9472 + 1, ^uint32(0)/9728 + 1, ^uint32(0)/10240 + 1, ^uint32(0)/10880 + 1, ^uint32(0)/12288 + 1, ^uint32(0)/13568 + 1, ^uint32(0)/14336 + 1, ^uint32(0)/16384 + 1, ^uint32(0)/18432 + 1, ^uint32(0)/19072 + 1, ^uint32(0)/20480 + 1, ^uint32(0)/21760 + 1, ^uint32(0)/24576 + 1, ^uint32(0)/27264 + 1, ^uint32(0)/28672 + 1, ^uint32(0)/32768 + 1}
+var size_to_class8 = [smallSizeMax/smallSizeDiv + 1]uint8{0, 1, 2, 3, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32}
+var size_to_class128 = [(_MaxSmallSize-smallSizeMax)/largeSizeDiv + 1]uint8{32, 33, 34, 35, 36, 37, 37, 38, 38, 39, 39, 40, 40, 40, 41, 41, 41, 42, 43, 43, 44, 44, 44, 44, 44, 45, 45, 45, 45, 45, 45, 46, 46, 46, 46, 47, 47, 47, 47, 47, 47, 48, 48, 48, 49, 49, 50, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 53, 53, 54, 54, 54, 54, 55, 55, 55, 55, 55, 56, 56, 56, 56, 56, 56, 56, 56, 56, 56, 56, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 58, 58, 58, 58, 58, 58, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 61, 61, 61, 61, 61, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67, 67}
+
+func divRoundUp(n, a uintptr) uintptr {
+	// a is generally a power of two. This will get inlined and
+	// the compiler will optimize the division.
+	return (n + a - 1) / a
+}
+
+// Returns size of the memory block that mallocgc will allocate if you ask for the size,
+// minus any inline space for metadata.
+func Roundupsize(size uintptr, noscan bool) (reqSize uintptr) {
+	reqSize = size
+	if reqSize <= _MaxSmallSize-8 {
+		// Small object.
+		if !noscan && reqSize > minSizeForMallocHeader { // !noscan && !heapBitsInSpan(reqSize)
+			reqSize += 8
+		}
+		// (reqSize - size) is either mallocHeaderSize or 0. We need to subtract mallocHeaderSize
+		// from the result if we have one, since mallocgc will add it back in.
+		if reqSize <= smallSizeMax-8 {
+			return uintptr(class_to_size[size_to_class8[divRoundUp(reqSize, smallSizeDiv)]]) - (reqSize - size)
+		}
+		return uintptr(class_to_size[size_to_class128[divRoundUp(reqSize-smallSizeMax, largeSizeDiv)]]) - (reqSize - size)
+	}
+	// Large object. Align reqSize up to the next page. Check for overflow.
+	reqSize += _PageSize - 1
+	if reqSize < size {
+		return size
+	}
+	return reqSize &^ (_PageSize - 1)
+}
+
+// Bswap32 returns its input with byte order reversed
+// 0x01020304 -> 0x04030201
+func Bswap32(x uint32) uint32 {
+	c8 := uint32(0x00ff00ff)
+	a := x >> 8 & c8
+	b := (x & c8) << 8
+	x = a | b
+	c16 := uint32(0x0000ffff)
+	a = x >> 16 & c16
+	b = (x & c16) << 16
+	x = a | b
+	return x
 }
 
 func NextPowerOfTwo(i uintptr) uintptr {
