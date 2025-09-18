@@ -454,6 +454,13 @@ func EncodeUnrolled8(dst, src []byte) int {
 	return j
 }
 
+// Bool2int returns 0 if x is false or 1 if x is true.
+func Bool2int(x bool) int {
+	// Avoid branches. In the SSA compiler, this compiles to
+	// exactly what you would want it to.
+	return int(*(*uint8)(unsafe.Pointer(&x)))
+}
+
 func MulUintptr(a, b uintptr) (uintptr, bool) {
 	if a|b < 1<<(4*PtrSize) || a == 0 {
 		return a * b, false
