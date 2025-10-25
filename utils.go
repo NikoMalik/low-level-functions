@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -262,6 +263,13 @@ func ValidateHex(src []byte) error {
 	}
 
 	return nil
+}
+
+// fast analog for word % p
+// https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+func Fastrange(word, p uint64) uint64 {
+	hi, _ := bits.Mul64(word, p)
+	return hi
 }
 
 // safety decode with checks
@@ -684,9 +692,10 @@ func GetPrivateField[T any, V any](ptr *T, fieldName string) *V {
 	return (*V)(unsafe.Pointer(uintptr(unsafe.Pointer(ptr)) + fieldOffset))
 }
 
+// pointers must be zeroed
 func Malloc[T any](t T) *T {
 	// Allocate memory and then copy the value of t into the allocated memory
-	ptr := (*T)(mallocgc(unsafe.Sizeof(t), Pointer(reflect.TypeOf(t)), false))
+	ptr := (*T)(mallocgc(unsafe.Sizeof(t), Pointer(reflect.TypeOf(t)), true))
 	*ptr = t // Copy the value of t into the allocated memory
 	return ptr
 }

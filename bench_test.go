@@ -36,6 +36,28 @@ func makeRandom(size int) []byte {
 	return src
 }
 
+func TestFastrange(t *testing.T) {
+	tests := []struct {
+		word, p uint64
+		want    uint64
+	}{
+		{0, 0, 0},
+		{1, 1, 0},
+		{1, math.MaxUint64, 0},
+		{math.MaxUint64, 1, 0},
+		{math.MaxUint64, math.MaxUint64, math.MaxUint64 - 1},
+		{123456789, 987654321, func() uint64 { hi := Fastrange(123456789, 987654321); return hi }()},
+		{0xFFFFFFFFFFFFFFFF, 0x8000000000000000, 0x7FFFFFFFFFFFFFFF},
+	}
+
+	for _, tt := range tests {
+		got := Fastrange(tt.word, tt.p)
+		if got != tt.want {
+			t.Errorf("fastrange(%d, %d) = %d; want %d", tt.word, tt.p, got, tt.want)
+		}
+	}
+}
+
 var sk []byte
 
 func bs(s string) []byte {
