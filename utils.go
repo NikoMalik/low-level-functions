@@ -29,6 +29,12 @@ const (
 	_PageMask              = _PageSize - 1
 )
 
+type Int interface {
+	~int8 | ~int16 | ~int32 | ~int64 | ~int |
+		~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uint |
+		~uintptr
+}
+
 var hexTbl = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
 
 var reverseHexTable = []byte(
@@ -990,9 +996,12 @@ func CopyUnsafe[T any](dst []T, src []T) int {
 //
 //go:nosplit
 //go:nocheckptr
-func Noescape(up unsafe.Pointer) unsafe.Pointer {
-	x := uintptr(up)
-	return unsafe.Pointer(x ^ 0)
+func NoEscape[P ~*E, E any](ptr P) P {
+	p := unsafe.Pointer(ptr)
+	// Xoring the address with zero is a reliable way to hide a pointer from
+	// the compiler.
+	p = unsafe.Pointer(uintptr(p) ^ 0) //nolint:staticcheck
+	return P(p)
 }
 
 var alwaysFalse bool
@@ -1045,8 +1054,44 @@ func string3(b []byte) string {
 	}{*(*uintptr)(unsafe.Pointer(&b)), len(b)}))
 }
 
+//go:nosplit
 func String(b []byte) string {
 	return unsafe.String(unsafe.SliceData(b), len(b))
+}
+
+// Add is like [unsafe.Add], but it operates on a typed pointer and scales the
+// offset by that type's size, similar to pointer arithmetic in Rust or C.
+//
+// This function has the same safety caveats as [unsafe.Add].
+//
+//go:nosplit
+func Add[P ~*E, E any, I Int](p P, idx I) P {
+	raw := unsafe.Pointer(p)
+	raw = unsafe.Add(raw, int(idx)*SizeOf[E]())
+	return P(raw)
+}
+
+// BoundsCheck performs a generic bounds check as efficiently as possible.
+//
+// This function assumes that len is the length of a slice, i.e, it is
+// non-negative.
+//
+//nolint:revive,predeclared // len is the right variable name ugh.
+func BoundsCheck[I Int](idx I, len int) bool {
+	// An unsigned comparison is sufficient. If idx is non-negative, it checks
+	// that it is less than len. If idx is negative, converting it to uint64
+	// will produce a value greater than math.Int64Max, which is greater than
+	// the positive value we get from casting len.
+	return uint64(idx) < uint64(len)
+}
+
+func SizeOf[T any]() int {
+	var v T
+	return int(unsafe.Sizeof(v))
+}
+
+func NoEscapeSlice[S ~[]E, E any](s S) S {
+	return unsafe.Slice(NoEscape(unsafe.SliceData(s)), cap(s))[:len(s)]
 }
 
 func string4(b []byte) string {
