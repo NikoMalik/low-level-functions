@@ -201,6 +201,12 @@ func DecodeUnrolled16(dst, src []byte) (int, error) { // with checks
 	return j, nil
 }
 
+//go:nosplit
+func NoEscapePtr[T any](p *T) *T {
+	x := uintptr(unsafe.Pointer(p))
+	return (*T)(unsafe.Pointer(x ^ 0))
+}
+
 // ValidateHex checks if src is a valid hex string (contains only 0-9, a-f, A-F and has even length).
 func ValidateHex(src []byte) error {
 	if len(src)%2 == 1 {
