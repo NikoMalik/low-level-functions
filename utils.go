@@ -201,12 +201,6 @@ func DecodeUnrolled16(dst, src []byte) (int, error) { // with checks
 	return j, nil
 }
 
-//go:nosplit
-func NoEscapePtr[T any](p *T) *T {
-	x := uintptr(unsafe.Pointer(p))
-	return (*T)(unsafe.Pointer(x ^ 0))
-}
-
 // ValidateHex checks if src is a valid hex string (contains only 0-9, a-f, A-F and has even length).
 func ValidateHex(src []byte) error {
 	if len(src)%2 == 1 {
@@ -996,6 +990,29 @@ func CopyUnsafe[T any](dst []T, src []T) int {
 		uintptr(len(src))*unsafe.Sizeof(src[0]),
 	)
 	return len(src)
+}
+
+func AlignSlice[T any](n, align int) []T {
+	if n <= 0 {
+		return nil
+	}
+
+	var zero T
+	size := int(unsafe.Sizeof(zero))
+
+	if size == 0 || align <= 0 || align%size != 0 {
+		panic("invalid alignment")
+	}
+
+	pad := align/size - 1
+	s := make([]T, n+pad)
+
+	p := uintptr(unsafe.Pointer(&s[0]))
+	aligned := (p + uintptr(align-1)) &^ uintptr(align-1)
+
+	i := int((aligned - p) / uintptr(size))
+
+	return s[i : i+n : i+n]
 }
 
 // Noescape forces any pointerx not escape to the heap
